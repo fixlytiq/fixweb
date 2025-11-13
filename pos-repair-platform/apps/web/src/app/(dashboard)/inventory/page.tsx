@@ -23,10 +23,10 @@ export default function InventoryPage() {
 
       {/* Low Stock Alert */}
       {lowStockItems.length > 0 && (
-        <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
+        <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-800 dark:bg-gray-800">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-orange-600" />
-            <p className="font-medium text-orange-900">
+            <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-red-500" />
+            <p className="font-medium text-orange-900 dark:text-gray-200">
               {lowStockItems.length} item{lowStockItems.length > 1 ? "s" : ""} running low on stock
             </p>
           </div>
@@ -53,7 +53,7 @@ export default function InventoryPage() {
               className={cn(
                 "rounded-lg border p-6 transition-all hover:shadow-lg",
                 isLowStock
-                  ? "border-orange-200 bg-orange-50"
+                  ? "border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-gray-800"
                   : "border-border bg-card"
               )}
             >
@@ -61,15 +61,24 @@ export default function InventoryPage() {
                 <div className="flex-1">
                   <div className="mb-2 flex items-center gap-2">
                     <Package className="h-5 w-5 text-primary" />
-                    <h3 className="font-semibold text-foreground">{item.name}</h3>
+                    <h3 className={cn(
+                      "font-semibold text-foreground",
+                      isLowStock && "dark:text-gray-200"
+                    )}>{item.name}</h3>
                   </div>
-                  <p className="mb-2 text-sm text-muted-foreground">SKU: {item.sku}</p>
+                  <p className={cn(
+                    "mb-2 text-sm text-muted-foreground",
+                    isLowStock && "dark:text-gray-400"
+                  )}>SKU: {item.sku}</p>
                   {item.description && (
-                    <p className="mb-4 text-sm text-muted-foreground">{item.description}</p>
+                    <p className={cn(
+                      "mb-4 text-sm text-muted-foreground",
+                      isLowStock && "dark:text-gray-400"
+                    )}>{item.description}</p>
                   )}
                 </div>
                 {isLowStock && (
-                  <AlertTriangle className="h-5 w-5 text-orange-600" />
+                  <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-red-500" />
                 )}
               </div>
 
@@ -78,7 +87,7 @@ export default function InventoryPage() {
                   <span className="text-muted-foreground">Quantity on Hand</span>
                   <span className={cn(
                     "font-semibold",
-                    isLowStock ? "text-orange-600" : "text-foreground"
+                    isLowStock ? "text-red-500 dark:text-red-400" : "text-foreground"
                   )}>
                     {item.quantityOnHand}
                   </span>

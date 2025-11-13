@@ -141,18 +141,18 @@ export default function DashboardPage() {
               lowStockItems.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between rounded-lg border border-orange-200 bg-orange-50 p-4"
+                  className="flex items-center justify-between rounded-lg border border-orange-200 bg-orange-50 p-4 transition-all hover:shadow-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 dark:border-orange-800 dark:bg-gray-800"
                 >
                   <div className="flex-1">
-                    <p className="font-medium text-foreground">{item.name}</p>
-                    <p className="text-sm text-muted-foreground">SKU: {item.sku}</p>
+                    <p className="font-medium text-foreground dark:text-gray-200">{item.name}</p>
+                    <p className="text-sm text-muted-foreground dark:text-gray-400">SKU: {item.sku}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-orange-600">
+                    <p className="text-sm font-semibold text-red-500 dark:text-red-400">
                       {item.quantityOnHand} left
                     </p>
                     {item.reorderPoint && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground dark:text-gray-400">
                         Reorder at {item.reorderPoint}
                       </p>
                     )}

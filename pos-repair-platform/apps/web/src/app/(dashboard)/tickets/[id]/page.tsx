@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Edit, Clock, User, Calendar } from "lucide-react";
@@ -20,9 +20,9 @@ const statusColors: Record<TicketStatus, string> = {
 export default function TicketDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const { id } = params;
+  const { id } = use(params);
   const router = useRouter();
   
   const [ticket, setTicket] = useState(() => mockTickets.find((t) => t.id === id));
