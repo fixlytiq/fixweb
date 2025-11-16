@@ -135,15 +135,13 @@ export function TicketStatusUpdater({
       <div className="rounded-lg border border-border bg-card p-4">
         <p className="mb-3 text-sm font-medium text-foreground">Quick Actions</p>
         <div className="flex flex-wrap gap-2">
-          {currentStatus !== "CANCELLED" && (
-            <button
-              onClick={() => handleStatusChange("CANCELLED")}
-              disabled={isUpdating}
-              className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50 dark:border-red-900 dark:bg-red-900/20 dark:text-red-400"
-            >
-              Cancel Ticket
-            </button>
-          )}
+          <button
+            onClick={() => handleStatusChange("CANCELLED" as TicketStatus)}
+            disabled={isUpdating}
+            className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50 dark:border-red-900 dark:bg-red-900/20 dark:text-red-400"
+          >
+            Cancel Ticket
+          </button>
           {currentStatus === "IN_PROGRESS" && (
             <button
               onClick={() => handleStatusChange("READY")}

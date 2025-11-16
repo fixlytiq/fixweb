@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { mockStockItems, mockCustomers } from "@/lib/mock-data";
-import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/auth-context";
+import { inventoryApi, type StockItem } from "@/lib/api/inventory";
+import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Loader2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CartItem {
@@ -10,25 +11,74 @@ interface CartItem {
   name: string;
   price: number;
   quantity: number;
+  stockItemId: string;
 }
 
 export default function POSPage() {
+  const { user } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [inventory, setInventory] = useState<StockItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const filteredItems = mockStockItems.filter(
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Fetch inventory for the user's store
+        const inventoryData = await inventoryApi.findAll();
+        setInventory(inventoryData);
+      } catch (err: any) {
+        console.error("Error fetching POS data:", err);
+        setError(err.message || "Failed to load POS data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  const filteredItems = inventory.filter(
     (item) =>
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.sku.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const addToCart = (item: typeof mockStockItems[0]) => {
-    const existingItem = cart.find((cartItem) => cartItem.id === item.id);
+  const addToCart = (item: StockItem) => {
+    // Safely coerce unitPrice to a number
+    const rawPrice =
+      typeof item.unitPrice === "number"
+        ? item.unitPrice
+        : item.unitPrice != null
+        ? Number(item.unitPrice as any)
+        : undefined;
+
+    if (!rawPrice || Number.isNaN(rawPrice) || item.quantityOnHand === 0) {
+      alert("This item is not available for sale");
+      return;
+    }
+
+    const existingItem = cart.find((cartItem) => cartItem.stockItemId === item.id);
     if (existingItem) {
+      // Check if adding one more would exceed available stock
+      if (existingItem.quantity >= item.quantityOnHand) {
+        alert(`Only ${item.quantityOnHand} items available in stock`);
+        return;
+      }
       setCart(
         cart.map((cartItem) =>
-          cartItem.id === item.id
+          cartItem.stockItemId === item.id
             ? { ...cartItem, quantity: cartItem.quantity + 1 }
             : cartItem
         )
@@ -37,22 +87,38 @@ export default function POSPage() {
       setCart([
         ...cart,
         {
-          id: item.id,
+          id: `${item.id}-${Date.now()}`,
           name: item.name,
-          price: item.unitPrice || 0,
+          price: rawPrice,
           quantity: 1,
+          stockItemId: item.id,
         },
       ]);
     }
   };
 
   const updateQuantity = (id: string, delta: number) => {
+    const cartItem = cart.find((item) => item.id === id);
+    if (!cartItem) return;
+
+    const inventoryItem = inventory.find((item) => item.id === cartItem.stockItemId);
+    if (!inventoryItem) return;
+
+    const newQuantity = cartItem.quantity + delta;
+    if (newQuantity < 1) {
+      removeFromCart(id);
+      return;
+    }
+
+    if (newQuantity > inventoryItem.quantityOnHand) {
+      alert(`Only ${inventoryItem.quantityOnHand} items available in stock`);
+      return;
+    }
+
     setCart(
-      cart
-        .map((item) =>
-          item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item
-        )
-        .filter((item) => item.quantity > 0)
+      cart.map((item) =>
+        item.id === id ? { ...item, quantity: newQuantity } : item
+      )
     );
   };
 
@@ -60,9 +126,47 @@ export default function POSPage() {
     setCart(cart.filter((item) => item.id !== id));
   };
 
+  const handleCheckout = async () => {
+    if (cart.length === 0) {
+      alert("Cart is empty");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // TODO: Implement sales API integration
+      // For now, just show a success message
+      alert("Payment processed successfully! (Sales API integration coming soon)");
+      
+      // Clear cart after successful checkout
+      setCart([]);
+      setSelectedCustomer(null);
+      
+      // Refresh inventory to update stock levels (store ID is automatically taken from JWT token)
+      const inventoryData = await inventoryApi.findAll();
+      setInventory(inventoryData);
+    } catch (err: any) {
+      console.error("Error processing payment:", err);
+      alert(err.message || "Failed to process payment");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const tax = subtotal * 0.08; // 8% tax
   const total = subtotal + tax;
+
+  if (isLoading && inventory.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading POS...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid h-[calc(100vh-8rem)] gap-6 lg:grid-cols-3">
@@ -73,7 +177,16 @@ export default function POSPage() {
           <p className="mt-2 text-muted-foreground">Select items to add to cart</p>
         </div>
 
-        {/* Customer Selection */}
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-gray-800">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              <p className="font-medium text-red-900 dark:text-red-200">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Customer Selection - Placeholder */}
         <div className="rounded-lg border border-border bg-card p-4">
           <label className="mb-2 block text-sm font-medium text-foreground">Customer</label>
           <select
@@ -82,12 +195,7 @@ export default function POSPage() {
             className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
             <option value="">Walk-in Customer</option>
-            {mockCustomers.map((customer) => (
-              <option key={customer.id} value={customer.id}>
-                {customer.firstName} {customer.lastName}
-                {customer.phone && ` - ${customer.phone}`}
-              </option>
-            ))}
+            {/* TODO: Add customers API integration */}
           </select>
         </div>
 
@@ -104,34 +212,73 @@ export default function POSPage() {
         </div>
 
         {/* Product Grid */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          {filteredItems.map((item) => (
-            <div
-              key={item.id}
-              className="rounded-lg border border-border bg-card p-4 transition-all hover:shadow-md"
-            >
-              <div className="mb-2">
-                <h3 className="font-semibold text-foreground">{item.name}</h3>
-                <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>
-              </div>
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-lg font-bold text-foreground">
-                  ${item.unitPrice?.toFixed(2) || "0.00"}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  Stock: {item.quantityOnHand}
-                </span>
-              </div>
-              <button
-                onClick={() => addToCart(item)}
-                disabled={!item.unitPrice || item.quantityOnHand === 0}
-                className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-              >
-                Add to Cart
-              </button>
-            </div>
-          ))}
-        </div>
+        {filteredItems.length === 0 ? (
+          <div className="rounded-lg border border-border bg-card p-12 text-center">
+            <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">No products available</p>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {filteredItems.map((item) => {
+              const cartItem = cart.find((ci) => ci.stockItemId === item.id);
+              const isOutOfStock = !item.unitPrice || item.quantityOnHand === 0;
+              
+              return (
+                <div
+                  key={item.id}
+                  className={cn(
+                    "rounded-lg border border-border bg-card p-4 transition-all hover:shadow-md",
+                    isOutOfStock && "opacity-50"
+                  )}
+                >
+                  <div className="mb-2">
+                    <h3 className="font-semibold text-foreground">{item.name}</h3>
+                    <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>
+                  </div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-lg font-bold text-foreground">
+                      {(() => {
+                        const value =
+                          typeof item.unitPrice === "number"
+                            ? item.unitPrice
+                            : item.unitPrice != null
+                            ? Number(item.unitPrice as any)
+                            : undefined;
+                        return typeof value === "number" && !Number.isNaN(value)
+                          ? `$${value.toFixed(2)}`
+                          : "$0.00";
+                      })()}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-xs",
+                        item.quantityOnHand === 0
+                          ? "text-red-500 font-semibold"
+                          : item.quantityOnHand <= 5
+                          ? "text-orange-500"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      Stock: {item.quantityOnHand}
+                    </span>
+                  </div>
+                  {cartItem && (
+                    <div className="mb-2 text-xs text-primary font-medium">
+                      In cart: {cartItem.quantity}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => addToCart(item)}
+                    disabled={isOutOfStock}
+                    className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isOutOfStock ? "Out of Stock" : "Add to Cart"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Cart Sidebar */}
@@ -153,7 +300,17 @@ export default function POSPage() {
               >
                 <div className="flex-1">
                   <p className="text-sm font-medium text-foreground">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">${item.price.toFixed(2)} each</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(() => {
+                      const value =
+                        typeof item.price === "number"
+                          ? item.price
+                          : item.price != null
+                          ? Number(item.price as any)
+                          : 0;
+                      return `$${(Number.isNaN(value) ? 0 : value).toFixed(2)} each`;
+                    })()}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -198,9 +355,22 @@ export default function POSPage() {
               <span>Total</span>
               <span>${total.toFixed(2)}</span>
             </div>
-            <button className="mt-4 w-full rounded-lg bg-primary px-4 py-3 text-base font-medium text-primary-foreground transition-colors hover:bg-primary/90 flex items-center justify-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Process Payment
+            <button
+              onClick={handleCheckout}
+              disabled={isProcessing}
+              className="mt-4 w-full rounded-lg bg-primary px-4 py-3 text-base font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="h-5 w-5" />
+                  Process Payment
+                </>
+              )}
             </button>
           </div>
         )}
@@ -208,4 +378,3 @@ export default function POSPage() {
     </div>
   );
 }
-

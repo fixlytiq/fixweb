@@ -1,0 +1,568 @@
+{
+	"info": {
+		"_postman_id": "pos-repair-platform-api",
+		"name": "POS Repair Platform API",
+		"description": "Complete API collection for the POS Repair Platform - Updated for new authentication and data isolation",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{authToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Auto-save token and store ID from registration response",
+									"if (pm.response.code === 201) {",
+									"    try {",
+									"        const response = pm.response.json();",
+									"        if (response.token) {",
+									"            pm.environment.set('authToken', response.token);",
+									"            console.log('✅ Token saved to environment');",
+									"        } else {",
+									"            console.log('⚠️ No token in response');",
+									"        }",
+									"        if (response.store && response.store.id) {",
+									"            pm.environment.set('storeId', response.store.id);",
+									"            console.log('✅ Store ID saved to environment');",
+									"        }",
+									"    } catch (e) {",
+									"        console.log('❌ Error parsing response:', e.message);",
+									"    }",
+									"} else {",
+									"    console.log('⚠️ Registration failed with status:', pm.response.code);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ownerName\": \"John Doe\",\n  \"storeName\": \"Main Street Repair Shop\",\n  \"storeEmail\": \"store@example.com\",\n  \"pin\": \"1234\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "register"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Auto-save token and store ID from login response",
+									"if (pm.response.code === 200) {",
+									"    try {",
+									"        const response = pm.response.json();",
+									"        if (response.token) {",
+									"            pm.environment.set('authToken', response.token);",
+									"            console.log('✅ Token saved to environment');",
+									"        } else {",
+									"            console.log('⚠️ No token in response');",
+									"        }",
+									"        if (response.user && response.user.storeId) {",
+									"            pm.environment.set('storeId', response.user.storeId);",
+									"            console.log('✅ Store ID saved to environment');",
+									"        }",
+									"    } catch (e) {",
+									"        console.log('❌ Error parsing response:', e.message);",
+									"    }",
+									"} else {",
+									"    console.log('⚠️ Login failed with status:', pm.response.code);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"storeEmail\": \"store@example.com\",\n  \"pin\": \"1234\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "login"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Stores",
+			"item": [
+				{
+					"name": "Get All Stores",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/stores",
+							"host": ["{{baseUrl}}"],
+							"path": ["stores"]
+						}
+					},
+					"description": "⚠️ Requires authentication! Make sure you've logged in first using the 'Login' endpoint. This returns your store (users can only see their own store).\n\nIf you get 'Unauthorized':\n1. First login using POST /auth/login\n2. Check that authToken is set in your environment\n3. Verify the Authorization header shows 'Bearer {{authToken}}'",
+					"response": []
+				},
+				{
+					"name": "Get Store by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/stores/{{storeId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["stores", "{{storeId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Store",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Updated Store Name\",\n  \"timezone\": \"America/New_York\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/stores/{{storeId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["stores", "{{storeId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Store",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/stores/{{storeId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["stores", "{{storeId}}"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Employees",
+			"item": [
+				{
+					"name": "Create Employee",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    if (response.id) {",
+									"        pm.environment.set('employeeId', response.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Jane Smith\",\n  \"pin\": \"5678\",\n  \"role\": \"TECHNICIAN\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/employees",
+							"host": ["{{baseUrl}}"],
+							"path": ["employees"]
+						},
+						"description": "Create a new employee. Requires OWNER or MANAGER role. Role must be one of: OWNER, MANAGER, TECHNICIAN, CASHIER, VIEWER.\n\n⚠️ IMPORTANT: Each employee must have a unique PIN within the store. If you try to create an employee with a PIN that already exists, you'll get a 409 Conflict error."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Employees",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/employees",
+							"host": ["{{baseUrl}}"],
+							"path": ["employees"]
+						},
+						"description": "Get all employees for your store. Requires OWNER or MANAGER role."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Employee",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/employees/{{employeeId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["employees", "{{employeeId}}"]
+						},
+						"description": "Delete an employee. Requires OWNER or MANAGER role. Cannot delete the main owner employee."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Inventory",
+			"item": [
+				{
+					"name": "Create Stock Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sku\": \"SKU-001\",\n  \"name\": \"iPhone Screen Replacement\",\n  \"description\": \"Original Apple iPhone screen replacement\",\n  \"unitCost\": 45.99,\n  \"unitPrice\": 89.99,\n  \"reorderPoint\": 10,\n  \"initialQuantity\": 50\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/inventory",
+							"host": ["{{baseUrl}}"],
+							"path": ["inventory"]
+						},
+						"description": "Create a new stock item. Requires OWNER or MANAGER role. Store ID is automatically taken from JWT token."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Inventory",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/inventory",
+							"host": ["{{baseUrl}}"],
+							"path": ["inventory"]
+						},
+						"description": "Get all inventory items for your store. Store ID is automatically taken from JWT token."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Stock Item by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/inventory/{{stockItemId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["inventory", "{{stockItemId}}"]
+						},
+						"description": "Get a specific stock item by ID. Set stockItemId in your environment variables first, or replace {{stockItemId}} with an actual stock item ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Stock Item",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Updated Item Name\",\n  \"unitPrice\": 99.99,\n  \"reorderPoint\": 15\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/inventory/{{stockItemId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["inventory", "{{stockItemId}}"]
+						},
+						"description": "Update a stock item. Requires OWNER or MANAGER role. Replace {{stockItemId}} with the actual stock item ID from 'Get All Inventory' response."
+					},
+					"response": []
+				},
+				{
+					"name": "Adjust Stock Quantity",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"quantityChange\": 10,\n  \"reason\": \"RESTOCK\",\n  \"note\": \"Restocked from supplier\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/inventory/{{stockItemId}}/adjust",
+							"host": ["{{baseUrl}}"],
+							"path": ["inventory", "{{stockItemId}}", "adjust"]
+						},
+						"description": "Adjust stock quantity. Requires OWNER or MANAGER role. Replace {{stockItemId}} with the actual stock item ID. Reason can be: RESTOCK, SALE, RETURN, ADJUSTMENT, DAMAGED, EXPIRED, THEFT, OTHER"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Stock Item",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/inventory/{{stockItemId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["inventory", "{{stockItemId}}"]
+						},
+						"description": "Delete a stock item. Requires OWNER or MANAGER role. Replace {{stockItemId}} with the actual stock item ID from 'Get All Inventory' response."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Time Clock",
+			"item": [
+				{
+					"name": "Clock In",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notes\": \"Starting morning shift\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/time-clock/clock-in",
+							"host": ["{{baseUrl}}"],
+							"path": ["time-clock", "clock-in"]
+						},
+						"description": "Clock in for your shift. Store ID and Employee ID are automatically taken from JWT token."
+					},
+					"response": []
+				},
+				{
+					"name": "Clock Out",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notes\": \"Ending shift\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/time-clock/clock-out",
+							"host": ["{{baseUrl}}"],
+							"path": ["time-clock", "clock-out"]
+						},
+						"description": "Clock out from your shift. Store ID and Employee ID are automatically taken from JWT token."
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Time Clocks",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/time-clock/my-clocks",
+							"host": ["{{baseUrl}}"],
+							"path": ["time-clock", "my-clocks"]
+						},
+						"description": "Get all your time clock records. Store ID and Employee ID are automatically taken from JWT token."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Active Clock",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/time-clock/active",
+							"host": ["{{baseUrl}}"],
+							"path": ["time-clock", "active"]
+						},
+						"description": "Get your currently active clock-in (if any). Store ID and Employee ID are automatically taken from JWT token."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Refunds",
+			"item": [
+				{
+					"name": "Create Refund",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"saleId\": \"sale-id-here\",\n  \"amount\": 89.99,\n  \"reason\": \"Customer requested refund\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/refunds",
+							"host": ["{{baseUrl}}"],
+							"path": ["refunds"]
+						},
+						"description": "Create a refund for a sale. Requires OWNER or MANAGER role. Store ID is automatically taken from JWT token."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Refunds",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/refunds",
+							"host": ["{{baseUrl}}"],
+							"path": ["refunds"]
+						},
+						"description": "Get all refunds for your store. Store ID is automatically taken from JWT token."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Refund by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/refunds/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["refunds", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						},
+						"description": "Get a specific refund by ID. Store ID is automatically taken from JWT token."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "authToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "storeId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "employeeId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "stockItemId",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

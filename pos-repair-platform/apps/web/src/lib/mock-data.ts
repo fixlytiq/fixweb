@@ -12,8 +12,8 @@ export interface Organization {
 
 export interface Store {
   id: string;
-  organizationId: string;
   name: string;
+  storeEmail: string;
   timezone: string;
 }
 
@@ -27,7 +27,7 @@ export interface User {
 
 export interface Customer {
   id: string;
-  organizationId: string;
+  storeId: string;
   firstName: string;
   lastName: string;
   email?: string;
@@ -36,7 +36,6 @@ export interface Customer {
 
 export interface Ticket {
   id: string;
-  organizationId: string;
   storeId: string;
   customerId?: string;
   technicianId?: string;
@@ -58,7 +57,6 @@ export interface Ticket {
 
 export interface StockItem {
   id: string;
-  organizationId: string;
   storeId: string;
   sku: string;
   name: string;
@@ -71,7 +69,6 @@ export interface StockItem {
 
 export interface Sale {
   id: string;
-  organizationId: string;
   storeId: string;
   ticketId?: string;
   customerId?: string;
@@ -86,19 +83,15 @@ export interface Sale {
 }
 
 // Mock Data
-export const mockOrganizations: Organization[] = [
-  { id: "org-1", name: "TechRepair Inc", createdAt: "2024-01-15T00:00:00Z" },
-];
-
 export const mockStores: Store[] = [
-  { id: "store-1", organizationId: "org-1", name: "Downtown Location", timezone: "America/Chicago" },
-  { id: "store-2", organizationId: "org-1", name: "Mall Location", timezone: "America/Chicago" },
+  { id: "store-1", name: "Downtown Location", storeEmail: "downtown@example.com", timezone: "America/Chicago" },
+  { id: "store-2", name: "Mall Location", storeEmail: "mall@example.com", timezone: "America/Chicago" },
 ];
 
 export const mockCustomers: Customer[] = [
-  { id: "cust-1", organizationId: "org-1", firstName: "John", lastName: "Doe", email: "john@example.com", phone: "555-0101" },
-  { id: "cust-2", organizationId: "org-1", firstName: "Jane", lastName: "Smith", email: "jane@example.com", phone: "555-0102" },
-  { id: "cust-3", organizationId: "org-1", firstName: "Bob", lastName: "Johnson", phone: "555-0103" },
+  { id: "cust-1", storeId: "store-1", firstName: "John", lastName: "Doe", email: "john@example.com", phone: "555-0101" },
+  { id: "cust-2", storeId: "store-1", firstName: "Jane", lastName: "Smith", email: "jane@example.com", phone: "555-0102" },
+  { id: "cust-3", storeId: "store-1", firstName: "Bob", lastName: "Johnson", phone: "555-0103" },
 ];
 
 export const mockUsers: User[] = [
@@ -109,7 +102,6 @@ export const mockUsers: User[] = [
 export const mockTickets: Ticket[] = [
   {
     id: "ticket-1",
-    organizationId: "org-1",
     storeId: "store-1",
     customerId: "cust-1",
     technicianId: "user-2",
@@ -184,7 +176,6 @@ export const mockTickets: Ticket[] = [
 export const mockStockItems: StockItem[] = [
   {
     id: "item-1",
-    organizationId: "org-1",
     storeId: "store-1",
     sku: "IPH14-SCR-001",
     name: "iPhone 14 Screen Assembly",
@@ -235,7 +226,6 @@ export const mockStockItems: StockItem[] = [
 export const mockSales: Sale[] = [
   {
     id: "sale-1",
-    organizationId: "org-1",
     storeId: "store-1",
     ticketId: "ticket-4",
     customerId: "cust-1",

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document restructures the original Word blueprint into Markdown so it can serve as source material for future web or documentation tooling. It captures the architectural vision for a multi-tenant point-of-sale and repair management platform tailored to mobile repair stores. The system unifies ticketing, inventory, vendor management, AI-assisted dispute handling, and analytics across web and mobile surfaces.
+This document restructures the original Word blueprint into Markdown so it can serve as source material for future web or documentation tooling. It captures the architectural vision for a point-of-sale and repair management platform tailored to mobile repair stores. The system unifies ticketing, inventory, vendor management, AI-assisted dispute handling, and analytics across web and mobile surfaces. The architecture uses a store-based model where each registration creates an owner, store, and first employee.
 
 ## 1. Tech Stack
 
@@ -63,32 +63,35 @@ This document restructures the original Word blueprint into Markdown so it can s
 - `Approvals & Quotes`: One-tap send/approve workflow.
 
 ### Core UI Components
-- `TicketTimeline`, `SignaturePad`, `POSCart`, `VendorForm`, `StoreSwitcher`, `AuditTrailTable`.
+- `TicketTimeline`, `SignaturePad`, `POSCart`, `VendorForm`, `AuditTrailTable`.
 
 ## 4. Data Architecture
 
-- Hierarchy: `organizations → stores → users`.
-- RBAC via memberships and store-specific roles (Owner, Manager, Technician, Cashier).
+- Hierarchy: `Owner → Store → Employee`.
+- Store-based authentication: Users log in with `storeEmail` and individual employee `pin`.
+- RBAC via store-specific roles (OWNER, MANAGER, TECHNICIAN, CASHIER, VIEWER).
 - Operational tables: `tickets`, `waivers`, `stock_items`, `purchase_orders`, `sales`, `disputes`, `dispute_evidence`.
-- All queries scoped by `organization_id` and `store_id`. Row-level security enforced through JWT claims.
+- All queries scoped by `store_id` derived from JWT token claims. Row-level security enforced through JWT claims.
+- Registration creates the first store, owner, and owner-employee in a single transaction.
 
 ## 5. Role Access Matrix
 
 | Feature        | Owner         | Manager          | Technician  | Cashier    |
 |---------------|---------------|------------------|-------------|------------|
-| Reports        | All Stores    | Assigned Stores  | No          | No         |
+| Reports        | All           | Store Only       | No          | No         |
 | Inventory      | Full          | Edit             | View Only   | No         |
 | Tickets        | All           | All              | Own Only    | View       |
 | POS/Payments   | All           | All              | No          | Execute    |
 | Vendor Orders  | All           | Limited          | No          | No         |
-| Disputes       | All           | Assigned Stores  | No          | No         |
+| Disputes       | All           | Store Only       | No          | No         |
 
-## 6. Multi-Store Model
+## 6. Store Model
 
-- Owners observe all stores within their organization.
-- Managers see data only for stores they are assigned to.
-- UI features a `StoreSwitcher` for multi-store context changes.
-- RLS ensures hardware-level data segregation.
+- Each registration creates one store with one owner and the first employee (the owner).
+- Owners can create additional stores via the "Create Additional Store" endpoint.
+- Each employee belongs to a single store and authenticates with the store's email and their unique PIN.
+- Store ID is automatically derived from the JWT token for all API requests.
+- No store switching UI needed - users are bound to their store context.
 
 ## 7. Implementation Roadmap
 
@@ -132,7 +135,7 @@ This document restructures the original Word blueprint into Markdown so it can s
 ## 9. Sample Schema Highlights
 
 ```sql
-CREATE TABLE organizations (
+CREATE TABLE owners (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
   created_at timestamptz DEFAULT now()
@@ -140,15 +143,24 @@ CREATE TABLE organizations (
 
 CREATE TABLE stores (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id uuid REFERENCES organizations(id),
+  owner_id uuid REFERENCES owners(id) NOT NULL,
   name text NOT NULL,
-  timezone text DEFAULT 'America/Chicago'
+  store_email text UNIQUE NOT NULL,
+  timezone text DEFAULT 'America/Chicago',
+  created_at timestamptz DEFAULT now()
 );
 
-CREATE TABLE users (
+CREATE TABLE employees (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email text UNIQUE NOT NULL,
-  password_hash text NOT NULL
+  store_id uuid REFERENCES stores(id) NOT NULL,
+  pin_hash text NOT NULL,
+  role text NOT NULL, -- OWNER, MANAGER, TECHNICIAN, CASHIER, VIEWER
+  first_name text,
+  last_name text,
+  email text,
+  phone text,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(store_id, pin_hash) -- Ensures unique PINs per store
 );
 ```
 

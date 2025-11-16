@@ -16,5 +16,12 @@
     "build:api": "npm --prefix apps/api run build",
     "lint:web": "npm --prefix apps/web run lint",
     "lint:api": "npm --prefix apps/api run lint"
+  },
+  "dependencies": {
+    "@nestjs/jwt": "^11.0.1",
+    "bcryptjs": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6"
   }
 }

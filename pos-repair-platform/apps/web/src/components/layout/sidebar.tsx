@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useAuth } from "@/contexts/auth-context";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -27,6 +28,18 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+  };
+
+  // Get user initials from role (since we don't have name in user object)
+  const userInitials = user?.role?.[0] || 'U';
+
+  const userName = user?.role || 'User';
+
+  const userEmail = `Store ID: ${user?.storeId?.slice(0, 8) || 'N/A'}`;
 
   return (
     <>
@@ -85,16 +98,19 @@ export function Sidebar() {
           <div className="border-t border-border p-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <span className="text-sm font-semibold">AU</span>
+                <span className="text-sm font-semibold">{userInitials}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">Admin User</p>
-                <p className="text-xs text-muted-foreground truncate">owner@fixlytiq.com</p>
+                <p className="text-sm font-medium text-foreground truncate">{userName}</p>
+                <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 mb-3">
               <ThemeToggle />
-              <button className="flex-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
+              <button
+                onClick={handleLogout}
+                className="flex-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
                 <LogOut className="h-4 w-4" />
                 Sign out
               </button>
