@@ -34,6 +34,14 @@ async function handleResponse<T>(response: Response): Promise<T> {
       errorMessage = response.statusText || errorMessage;
     }
 
+    // For 401 errors, clear the token as it's likely expired or invalid
+    if (errorCode === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+      }
+    }
+
     throw new ApiClientError(errorMessage, errorCode);
   }
 
@@ -83,6 +91,11 @@ export class ApiClient {
     const token = this.getToken();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      // Log warning if no token is available (only in development)
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('API Client: No authentication token found. Request may fail with 401 Unauthorized.');
+      }
     }
 
     return headers;
@@ -189,10 +202,19 @@ export class ApiClient {
 export const apiClient = new ApiClient();
 
 // Initialize token from localStorage on client side
+// Note: This runs at module load time, but the AuthContext also sets the token on mount
+// This is a fallback to ensure the token is available even if AuthContext hasn't loaded yet
 if (typeof window !== 'undefined') {
   const token = localStorage.getItem('auth_token');
   if (token) {
     apiClient.setToken(token);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('API Client: Token initialized from localStorage');
+    }
+  } else {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('API Client: No token found in localStorage. User may need to log in.');
+    }
   }
 }
 

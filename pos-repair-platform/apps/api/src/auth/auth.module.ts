@@ -13,12 +13,15 @@ import { PrismaModule } from '../prisma/prisma.module';
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET') || 'your-secret-key-change-in-production',
-        signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN') || '7d',
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const expiresIn = configService.get<string>('JWT_EXPIRES_IN') || '7d';
+        return {
+          secret: configService.get<string>('JWT_SECRET') || 'your-secret-key-change-in-production',
+          signOptions: {
+            expiresIn: expiresIn as any,
+          },
+        };
+      },
       inject: [ConfigService],
     }),
   ],

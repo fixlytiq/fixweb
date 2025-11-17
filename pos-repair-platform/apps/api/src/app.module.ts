@@ -9,6 +9,8 @@ import { EmployeesModule } from './employees/employees.module';
 import { TimeClockModule } from './time-clock/time-clock.module';
 import { RefundsModule } from './refunds/refunds.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { TicketsModule } from './tickets/tickets.module';
+import { SalesModule } from './sales/sales.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { InventoryModule } from './inventory/inventory.module';
     TimeClockModule,
     RefundsModule,
     InventoryModule,
+    TicketsModule,
+    SalesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, ChevronRight, Loader2 } from "lucide-react";
-import { type TicketStatus } from "@/lib/mock-data";
+import { type TicketStatus } from "@/lib/api/tickets";
 import { cn } from "@/lib/utils";
 
 const statusFlow: TicketStatus[] = [

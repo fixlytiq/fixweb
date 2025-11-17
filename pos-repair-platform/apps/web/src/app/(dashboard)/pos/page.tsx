@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { inventoryApi, type StockItem } from "@/lib/api/inventory";
-import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Loader2, AlertTriangle } from "lucide-react";
+import { ticketsApi, type Ticket } from "@/lib/api/tickets";
+import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Loader2, AlertTriangle, Ticket as TicketIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 interface CartItem {
   id: string;
@@ -16,6 +19,10 @@ interface CartItem {
 
 export default function POSPage() {
   const { user } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const ticketId = searchParams.get("ticketId");
+  
   const [cart, setCart] = useState<CartItem[]>([]);
   const [inventory, setInventory] = useState<StockItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
@@ -23,6 +30,8 @@ export default function POSPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [isLoadingTicket, setIsLoadingTicket] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -38,6 +47,37 @@ export default function POSPage() {
         // Fetch inventory for the user's store
         const inventoryData = await inventoryApi.findAll();
         setInventory(inventoryData);
+
+        // If ticketId is provided, fetch ticket details
+        if (ticketId) {
+          setIsLoadingTicket(true);
+          try {
+            const ticketData = await ticketsApi.findOne(ticketId);
+            setTicket(ticketData);
+            
+            // Pre-populate customer if ticket has customer
+            if (ticketData.customerId) {
+              setSelectedCustomer(ticketData.customerId);
+            }
+
+            // Pre-populate cart with ticket total if available
+            if (ticketData.total && ticketData.total > 0) {
+              // Add a service item representing the repair
+              setCart([{
+                id: `ticket-${ticketData.id}`,
+                name: `Repair Service - ${ticketData.title}`,
+                price: ticketData.total,
+                quantity: 1,
+                stockItemId: "", // No stock item for service
+              }]);
+            }
+          } catch (err: any) {
+            console.error("Error fetching ticket:", err);
+            // Don't block POS if ticket fetch fails
+          } finally {
+            setIsLoadingTicket(false);
+          }
+        }
       } catch (err: any) {
         console.error("Error fetching POS data:", err);
         setError(err.message || "Failed to load POS data");
@@ -47,7 +87,7 @@ export default function POSPage() {
     };
 
     fetchData();
-  }, [user]);
+  }, [user, ticketId]);
 
   const filteredItems = inventory.filter(
     (item) =>
@@ -135,8 +175,22 @@ export default function POSPage() {
     setIsProcessing(true);
     try {
       // TODO: Implement sales API integration
-      // For now, just show a success message
-      alert("Payment processed successfully! (Sales API integration coming soon)");
+      // When sales API is ready, it should:
+      // 1. Create a sale record with ticketId (if ticket exists)
+      // 2. Update inventory stock levels
+      // 3. Link the sale to the ticket
+      
+      // For now, show a success message
+      const message = ticket 
+        ? `Payment processed successfully for ticket "${ticket.title}"! (Sales API integration coming soon)`
+        : "Payment processed successfully! (Sales API integration coming soon)";
+      alert(message);
+      
+      // If we came from a ticket, redirect back to ticket detail
+      if (ticket) {
+        router.push(`/tickets/${ticket.id}`);
+        return;
+      }
       
       // Clear cart after successful checkout
       setCart([]);
@@ -151,6 +205,10 @@ export default function POSPage() {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const removeTicketContext = () => {
+    router.push("/pos");
   };
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -172,10 +230,55 @@ export default function POSPage() {
     <div className="grid h-[calc(100vh-8rem)] gap-6 lg:grid-cols-3">
       {/* Product Selection */}
       <div className="lg:col-span-2 space-y-4 overflow-y-auto">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">POS Register</h1>
-          <p className="mt-2 text-muted-foreground">Select items to add to cart</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">POS Register</h1>
+            <p className="mt-2 text-muted-foreground">Select items to add to cart</p>
+          </div>
+          {ticket && (
+            <Link
+              href={`/tickets/${ticket.id}`}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              <TicketIcon className="h-4 w-4" />
+              View Ticket
+            </Link>
+          )}
         </div>
+
+        {/* Ticket Context Banner */}
+        {ticket && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <TicketIcon className="h-5 w-5 text-primary" />
+                  <h3 className="font-semibold text-foreground">Processing Payment for Ticket</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-1">
+                  <strong>Ticket:</strong> {ticket.title}
+                </p>
+                {ticket.customer && (
+                  <p className="text-sm text-muted-foreground mb-1">
+                    <strong>Customer:</strong> {ticket.customer.firstName} {ticket.customer.lastName}
+                  </p>
+                )}
+                {ticket.total && (
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Ticket Total:</strong> ${ticket.total.toFixed(2)}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={removeTicketContext}
+                className="ml-4 rounded-lg p-1 text-muted-foreground transition-colors hover:bg-background"
+                title="Remove ticket context"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-gray-800">

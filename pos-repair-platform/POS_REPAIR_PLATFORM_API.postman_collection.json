@@ -27,24 +27,47 @@
 							"script": {
 								"exec": [
 									"// Auto-save token and store ID from registration response",
+									"// Check if environment is selected",
+									"if (!pm.environment.name) {",
+									"    console.log('⚠️ WARNING: No environment selected! Token will not be saved.');",
+									"    console.log('Please select an environment from the top-right dropdown.');",
+									"}",
+									"",
 									"if (pm.response.code === 201) {",
 									"    try {",
 									"        const response = pm.response.json();",
+									"        ",
+									"        // Save token",
 									"        if (response.token) {",
 									"            pm.environment.set('authToken', response.token);",
-									"            console.log('✅ Token saved to environment');",
+									"            console.log('✅ Token saved to environment:', pm.environment.name || 'default');",
+									"            console.log('Token preview:', response.token.substring(0, 20) + '...');",
 									"        } else {",
-									"            console.log('⚠️ No token in response');",
+									"            console.log('⚠️ No token in response. Response keys:', Object.keys(response));",
 									"        }",
+									"        ",
+									"        // Save store ID",
 									"        if (response.store && response.store.id) {",
 									"            pm.environment.set('storeId', response.store.id);",
-									"            console.log('✅ Store ID saved to environment');",
+									"            console.log('✅ Store ID saved:', response.store.id);",
+									"        } else {",
+									"            console.log('⚠️ No store ID in response');",
+									"        }",
+									"        ",
+									"        // Verify token was saved",
+									"        const savedToken = pm.environment.get('authToken');",
+									"        if (savedToken) {",
+									"            console.log('✅ Verification: Token is now in environment');",
+									"        } else {",
+									"            console.log('❌ ERROR: Token was not saved! Check environment selection.');",
 									"        }",
 									"    } catch (e) {",
 									"        console.log('❌ Error parsing response:', e.message);",
+									"        console.log('Response body:', pm.response.text());",
 									"    }",
 									"} else {",
 									"    console.log('⚠️ Registration failed with status:', pm.response.code);",
+									"    console.log('Response:', pm.response.text());",
 									"}"
 								],
 								"type": "text/javascript"
@@ -82,24 +105,48 @@
 							"script": {
 								"exec": [
 									"// Auto-save token and store ID from login response",
+									"// Check if environment is selected",
+									"if (!pm.environment.name) {",
+									"    console.log('⚠️ WARNING: No environment selected! Token will not be saved.');",
+									"    console.log('Please select an environment from the top-right dropdown.');",
+									"}",
+									"",
 									"if (pm.response.code === 200) {",
 									"    try {",
 									"        const response = pm.response.json();",
+									"        ",
+									"        // Save token",
 									"        if (response.token) {",
 									"            pm.environment.set('authToken', response.token);",
-									"            console.log('✅ Token saved to environment');",
+									"            console.log('✅ Token saved to environment:', pm.environment.name || 'default');",
+									"            console.log('Token preview:', response.token.substring(0, 20) + '...');",
 									"        } else {",
-									"            console.log('⚠️ No token in response');",
+									"            console.log('⚠️ No token in response. Response keys:', Object.keys(response));",
+									"            console.log('Full response:', JSON.stringify(response, null, 2));",
 									"        }",
+									"        ",
+									"        // Save store ID",
 									"        if (response.user && response.user.storeId) {",
 									"            pm.environment.set('storeId', response.user.storeId);",
-									"            console.log('✅ Store ID saved to environment');",
+									"            console.log('✅ Store ID saved:', response.user.storeId);",
+									"        } else {",
+									"            console.log('⚠️ No store ID in response');",
+									"        }",
+									"        ",
+									"        // Verify token was saved",
+									"        const savedToken = pm.environment.get('authToken');",
+									"        if (savedToken) {",
+									"            console.log('✅ Verification: Token is now in environment');",
+									"        } else {",
+									"            console.log('❌ ERROR: Token was not saved! Check environment selection.');",
 									"        }",
 									"    } catch (e) {",
 									"        console.log('❌ Error parsing response:', e.message);",
+									"        console.log('Response body:', pm.response.text());",
 									"    }",
 									"} else {",
 									"    console.log('⚠️ Login failed with status:', pm.response.code);",
+									"    console.log('Response:', pm.response.text());",
 									"}"
 								],
 								"type": "text/javascript"
@@ -536,6 +583,276 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Tickets",
+			"item": [
+				{
+					"name": "Create Ticket",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    if (response.id) {",
+									"        pm.environment.set('ticketId', response.id);",
+									"        console.log('✅ Ticket ID saved:', response.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"iPhone 12 Screen Repair\",\n  \"description\": \"Customer dropped phone, screen is cracked. Needs replacement.\",\n  \"customerId\": null,\n  \"technicianId\": null,\n  \"status\": \"RECEIVED\",\n  \"estimatedCost\": 89.99,\n  \"scheduledAt\": null\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/tickets",
+							"host": ["{{baseUrl}}"],
+							"path": ["tickets"]
+						},
+						"description": "Create a new repair ticket. All authenticated users can create tickets. Status options: RECEIVED, IN_PROGRESS, AWAITING_PARTS, READY, COMPLETED, CANCELLED."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Tickets",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/tickets?status=RECEIVED&technicianId=",
+							"host": ["{{baseUrl}}"],
+							"path": ["tickets"],
+							"query": [
+								{
+									"key": "status",
+									"value": "RECEIVED",
+									"description": "Filter by status (optional): RECEIVED, IN_PROGRESS, AWAITING_PARTS, READY, COMPLETED, CANCELLED"
+								},
+								{
+									"key": "technicianId",
+									"value": "",
+									"description": "Filter by technician ID (optional)"
+								}
+							]
+						},
+						"description": "Get all tickets for your store. OWNER/MANAGER/TECHNICIAN can see all tickets. CASHIER/VIEWER can view all tickets. Optional query params: status, technicianId."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Ticket by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/tickets/{{ticketId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["tickets", "{{ticketId}}"]
+						},
+						"description": "Get a specific ticket with all details including notes and waivers. OWNER/MANAGER/TECHNICIAN have full access. CASHIER/VIEWER can view."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Ticket",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"IN_PROGRESS\",\n  \"technicianId\": \"{{employeeId}}\",\n  \"estimatedCost\": 99.99,\n  \"description\": \"Updated description\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/tickets/{{ticketId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["tickets", "{{ticketId}}"]
+						},
+						"description": "Update a ticket. OWNER/MANAGER/TECHNICIAN can update any ticket. Status changes automatically set timestamps (startedAt, completedAt, cancelledAt)."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Ticket",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/tickets/{{ticketId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["tickets", "{{ticketId}}"]
+						},
+						"description": "Delete a ticket. Requires OWNER/MANAGER/TECHNICIAN role. Cannot delete completed tickets."
+					},
+					"response": []
+				},
+				{
+					"name": "Add Ticket Note",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    if (response.id) {",
+									"        pm.environment.set('ticketNoteId', response.id);",
+									"        console.log('✅ Ticket note ID saved:', response.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"body\": \"Customer approved the repair. Proceeding with screen replacement.\",\n  \"visibility\": \"INTERNAL\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/tickets/{{ticketId}}/notes",
+							"host": ["{{baseUrl}}"],
+							"path": ["tickets", "{{ticketId}}", "notes"]
+						},
+						"description": "Add a note to a ticket. OWNER/MANAGER/TECHNICIAN/CASHIER can add notes. Visibility options: INTERNAL (default) or CUSTOMER."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Ticket Notes",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/tickets/{{ticketId}}/notes",
+							"host": ["{{baseUrl}}"],
+							"path": ["tickets", "{{ticketId}}", "notes"]
+						},
+						"description": "Get all notes for a ticket. All authenticated users can view notes."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Sales",
+			"item": [
+				{
+					"name": "Create Sale",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    if (response.id) {",
+									"        pm.environment.set('saleId', response.id);",
+									"        console.log('✅ Sale ID saved:', response.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ticketId\": \"{{ticketId}}\",\n  \"subtotal\": 150.00,\n  \"tax\": 12.00,\n  \"total\": 162.00,\n  \"paymentStatus\": \"PAID\",\n  \"reference\": \"TXN-001\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/sales",
+							"host": ["{{baseUrl}}"],
+							"path": ["sales"]
+						},
+						"description": "Create a new sale. Can be linked to a ticket by providing ticketId. Requires OWNER/MANAGER/CASHIER role. PaymentStatus options: PENDING, AUTHORIZED, PAID, REFUNDED, VOID."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Sales",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/sales",
+							"host": ["{{baseUrl}}"],
+							"path": ["sales"]
+						},
+						"description": "Get all sales for your store. All authenticated users can view sales."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Sales by Ticket ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/sales?ticketId={{ticketId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["sales"],
+							"query": [
+								{
+									"key": "ticketId",
+									"value": "{{ticketId}}",
+									"description": "Filter sales by ticket ID"
+								}
+							]
+						},
+						"description": "Get all sales linked to a specific ticket. This is used to show payment history on the ticket detail page."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Sale by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/sales/{{saleId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["sales", "{{saleId}}"]
+						},
+						"description": "Get a specific sale by ID with all details including customer and ticket information."
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"variable": [
@@ -561,6 +878,21 @@
 		},
 		{
 			"key": "stockItemId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "ticketId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "ticketNoteId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "saleId",
 			"value": "",
 			"type": "string"
 		}

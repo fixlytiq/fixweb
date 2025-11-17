@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, X, Check } from "lucide-react";
-import { mockCustomers, mockStores, type TicketStatus } from "@/lib/mock-data";
+import { ArrowLeft, Save, Loader2, AlertCircle, X } from "lucide-react";
+import { ticketsApi, type TicketStatus, type CreateTicketDto } from "@/lib/api/tickets";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useAuth } from "@/contexts/auth-context";
 
-type InspectionStatus = "YES" | "NO" | "NA";
+type InspectionStatus = "GOOD" | "DAMAGED" | "NA";
 
 interface InspectionItem {
   label: string;
@@ -16,9 +17,8 @@ interface InspectionItem {
 }
 
 const inspectionItems: InspectionItem[] = [
-  { label: "LCD Damage", preRepair: "NA", postRepair: "NA" },
-  { label: "Frame / Back Glass Cracked / Bent", preRepair: "NA", postRepair: "NA" },
-  { label: "Frame / Back Glass Scratched", preRepair: "NA", postRepair: "NA" },
+  { label: "LCD", preRepair: "NA", postRepair: "NA" },
+  { label: "Frame / Back Glass", preRepair: "NA", postRepair: "NA" },
   { label: "Front Facing Camera", preRepair: "NA", postRepair: "NA" },
   { label: "Rear Facing Camera", preRepair: "NA", postRepair: "NA" },
   { label: "Home button/Power button", preRepair: "NA", postRepair: "NA" },
@@ -28,24 +28,50 @@ const inspectionItems: InspectionItem[] = [
   { label: "Power / Volume / Vibration Buttons", preRepair: "NA", postRepair: "NA" },
   { label: "Ear Speaker / Sensor", preRepair: "NA", postRepair: "NA" },
   { label: "External Speaker", preRepair: "NA", postRepair: "NA" },
-  { label: "Battery Needs Servicing", preRepair: "NA", postRepair: "NA" },
-  { label: "Water / Liquid Damage", preRepair: "NA", postRepair: "NA" },
-  { label: "Missing Screws/Plates", preRepair: "NA", postRepair: "NA" },
+  { label: "Battery", preRepair: "NA", postRepair: "NA" },
+  { label: "Water / Liquid Indicator", preRepair: "NA", postRepair: "NA" },
+  { label: "Screws/Plates", preRepair: "NA", postRepair: "NA" },
 ];
 
 export default function NewTicketPage() {
   const router = useRouter();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inspectionData, setInspectionData] = useState<InspectionItem[]>(inspectionItems);
   
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      console.warn('NewTicketPage: User not authenticated, redirecting to login');
+      router.push('/login');
+    }
+  }, [isAuthenticated, authLoading, router]);
+  
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Don't render form if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
+  
   const [formData, setFormData] = useState({
-    location: "",
     customerName: "",
     contactNumber: "",
     alternateNumber: "",
     date: new Date().toISOString().split("T")[0],
     deviceInfo: "",
     service: "",
+    description: "", // Added description field
     imeiSerialNo: "",
     passcode: "",
     price: "",
@@ -57,18 +83,83 @@ export default function NewTicketPage() {
     deviceUnableToTestPost: "",
     whereToFindDevice: "",
     waiverAcknowledged: false,
+    status: "RECEIVED" as TicketStatus,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.waiverAcknowledged) {
+      alert("Please acknowledge the liability waiver to continue");
+      return;
+    }
+
     setIsSubmitting(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Build the ticket title from device info and service
+      const title = formData.deviceInfo && formData.service
+        ? `${formData.deviceInfo} - ${formData.service}`
+        : formData.deviceInfo || formData.service || "New Repair Ticket";
+
+      // Build description from form data
+      const descriptionParts: string[] = [];
+      if (formData.deviceInfo) descriptionParts.push(`Device: ${formData.deviceInfo}`);
+      if (formData.service) descriptionParts.push(`Service: ${formData.service}`);
+      if (formData.imeiSerialNo) descriptionParts.push(`IMEI/Serial: ${formData.imeiSerialNo}`);
+      if (formData.customerName) descriptionParts.push(`Customer: ${formData.customerName}`);
+      if (formData.contactNumber) descriptionParts.push(`Contact: ${formData.contactNumber}`);
+      if (formData.description) descriptionParts.push(`\n${formData.description}`);
+      
+      const description = descriptionParts.join("\n");
+
+      // Create ticket DTO
+      const createTicketDto: CreateTicketDto = {
+        title,
+        description: description || undefined,
+        status: formData.status as TicketStatus,
+        estimatedCost: formData.price ? parseFloat(formData.price) : undefined,
+      };
+
+      // Verify we have authentication before creating ticket
+      if (!isAuthenticated || !user) {
+        alert("You must be logged in to create a ticket. Redirecting to login...");
+        router.push('/login');
+        return;
+      }
+
+      // Debug: Log token status before making request
+      if (process.env.NODE_ENV === 'development') {
+        const token = localStorage.getItem('auth_token');
+        console.log('Creating ticket with auth:', {
+          isAuthenticated,
+          hasUser: !!user,
+          hasToken: !!token,
+          tokenLength: token?.length,
+        });
+      }
+
+      // Create the ticket
+      const ticket = await ticketsApi.create(createTicketDto);
+      
+      // TODO: Save inspection data and waiver to ticket (when backend supports it)
+      // For now, we'll just create the ticket with basic info
+      
+      // Redirect to the ticket detail page
+      router.push(`/tickets/${ticket.id}`);
+    } catch (error: any) {
+      console.error("Error creating ticket:", error);
+      
+      // Handle unauthorized error - redirect to login
+      if (error.statusCode === 401 || error.message === "Unauthorized") {
+        alert("Your session has expired. Please log in again.");
+        router.push('/login');
+        return;
+      }
+      
+      alert(error.message || "Failed to create ticket. Please try again.");
       setIsSubmitting(false);
-      console.log("Ticket created:", { formData, inspectionData });
-      router.push("/tickets");
-    }, 1000);
+    }
   };
 
   const handleChange = (
@@ -91,6 +182,21 @@ export default function NewTicketPage() {
         i === index ? { ...item, [type]: value } : item
       )
     );
+  };
+
+  const getInspectionButtonClass = (status: InspectionStatus, currentStatus: InspectionStatus) => {
+    if (status !== currentStatus) {
+      return "bg-background text-muted-foreground hover:bg-accent";
+    }
+    
+    switch (status) {
+      case "GOOD":
+        return "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400";
+      case "DAMAGED":
+        return "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400";
+      case "NA":
+        return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+    }
   };
 
   const calculateTax = (amount: number) => amount * 0.08;
@@ -116,24 +222,25 @@ export default function NewTicketPage() {
               </h1>
               <p className="mt-1 text-muted-foreground">And Liability Waiver</p>
             </div>
-            <div className="flex items-center gap-2">
-              <label htmlFor="location" className="text-sm font-medium text-foreground">
-                LOCATION:
-              </label>
-              <select
-                id="location"
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                className="h-9 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">Select Location</option>
-                {mockStores.map((store) => (
-                  <option key={store.id} value={store.id}>
-                    {store.name}
-                  </option>
-                ))}
-              </select>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label htmlFor="status" className="text-sm font-medium text-foreground">
+                  STATUS:
+                </label>
+                <select
+                  id="status"
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  className="h-9 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="RECEIVED">Received</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="AWAITING_PARTS">Awaiting Parts</option>
+                  <option value="READY">Ready</option>
+                  <option value="COMPLETED">Completed</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -383,87 +490,91 @@ export default function NewTicketPage() {
         {/* Device Testing Status */}
         <div className="rounded-lg border border-border bg-card p-6">
           <h2 className="mb-4 text-lg font-semibold text-foreground">Device Testing Status</h2>
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className={formData.status === "COMPLETED" ? "grid gap-6 md:grid-cols-2" : ""}>
             <div>
               <p className="mb-3 text-sm font-medium text-foreground">
-                Device is unable to be tested prior to repair
+                Device is able to be tested prior to repair
               </p>
-              <div className="flex gap-4">
+              <div className="flex gap-2">
                 {["YES", "NO", "NA"].map((option) => (
-                  <label key={option} className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="deviceUnableToTestPre"
-                      value={option}
-                      checked={formData.deviceUnableToTestPre === option}
-                      onChange={handleChange}
-                      className="h-4 w-4 text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm text-foreground">{option}</span>
-                  </label>
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, deviceUnableToTestPre: option }))}
+                    className={cn(
+                      "flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
+                      formData.deviceUnableToTestPre === option
+                        ? option === "YES"
+                          ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 dark:border-green-600"
+                          : option === "NO"
+                          ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 dark:border-red-600"
+                          : "border-gray-500 bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600"
+                        : "border-border bg-background text-foreground hover:bg-accent"
+                    )}
+                  >
+                    {option}
+                  </button>
                 ))}
               </div>
             </div>
-            <div>
-              <p className="mb-3 text-sm font-medium text-foreground">
-                Device is unable to be tested post to repair
-              </p>
-              <div className="flex gap-4">
-                {["YES", "NO", "NA"].map((option) => (
-                  <label key={option} className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="deviceUnableToTestPost"
-                      value={option}
-                      checked={formData.deviceUnableToTestPost === option}
-                      onChange={handleChange}
-                      className="h-4 w-4 text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm text-foreground">{option}</span>
-                  </label>
-                ))}
+            {formData.status === "COMPLETED" && (
+              <div>
+                <p className="mb-3 text-sm font-medium text-foreground">
+                  Device is able to be tested post to repair
+                </p>
+                <div className="flex gap-2">
+                  {["YES", "NO", "NA"].map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, deviceUnableToTestPost: option }))}
+                      className={cn(
+                        "flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
+                        formData.deviceUnableToTestPost === option
+                          ? option === "YES"
+                            ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 dark:border-green-600"
+                            : option === "NO"
+                            ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 dark:border-red-600"
+                            : "border-gray-500 bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600"
+                          : "border-border bg-background text-foreground hover:bg-accent"
+                      )}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Pre-Repair and Post-Repair Device Inspection */}
+        {/* Pre-Repair Device Inspection */}
         <div className="rounded-lg border border-border bg-card p-6">
           <h2 className="mb-4 text-lg font-semibold text-foreground">
-            Pre-Repair and Post-Repair Device Inspection
+            Pre-Repair Device Inspection
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-border">
                   <th className="border-r border-border bg-muted/50 p-2 text-left text-xs font-semibold text-foreground">
-                    Component / Condition
-                  </th>
-                  <th colSpan={3} className="border-r border-border bg-muted/50 p-2 text-center text-xs font-semibold text-foreground">
-                    Pre-Repair Device Inspection
+                    Component
                   </th>
                   <th colSpan={3} className="bg-muted/50 p-2 text-center text-xs font-semibold text-foreground">
-                    Post-Repair Device Inspection
+                    Pre-Repair Device Inspection
                   </th>
                 </tr>
                 <tr className="border-b border-border bg-muted/30">
                   <th className="border-r border-border"></th>
                   <th className="border-r border-border p-2 text-center text-xs font-medium text-foreground">
-                    Yes / Working
+                    GOOD
                   </th>
                   <th className="border-r border-border p-2 text-center text-xs font-medium text-foreground">
-                    No / Not Working
+                    DAMAGED
                   </th>
-                  <th className="border-r border-border p-2 text-center text-xs font-medium text-foreground">
+                  <th className="p-2 text-center text-xs font-medium text-foreground">
                     N/A
                   </th>
-                  <th className="border-r border-border p-2 text-center text-xs font-medium text-foreground">
-                    Yes / Working
-                  </th>
-                  <th className="border-r border-border p-2 text-center text-xs font-medium text-foreground">
-                    No / Not Working
-                  </th>
-                  <th className="p-2 text-center text-xs font-medium text-foreground">N/A</th>
                 </tr>
               </thead>
               <tbody>
@@ -473,60 +584,41 @@ export default function NewTicketPage() {
                       {item.label}
                     </td>
                     {/* Pre-Repair */}
-                    <td className="border-r border-border p-2 text-center">
-                      <input
-                        type="radio"
-                        name={`pre-${index}`}
-                        checked={item.preRepair === "YES"}
-                        onChange={() => handleInspectionChange(index, "preRepair", "YES")}
-                        className="h-4 w-4 text-primary focus:ring-primary"
-                      />
+                    <td className="border-r border-border p-2">
+                      <button
+                        type="button"
+                        onClick={() => handleInspectionChange(index, "preRepair", "GOOD")}
+                        className={cn(
+                          "w-full rounded px-2 py-1.5 text-xs font-medium transition-colors",
+                          getInspectionButtonClass("GOOD", item.preRepair)
+                        )}
+                      >
+                        GOOD
+                      </button>
                     </td>
-                    <td className="border-r border-border p-2 text-center">
-                      <input
-                        type="radio"
-                        name={`pre-${index}`}
-                        checked={item.preRepair === "NO"}
-                        onChange={() => handleInspectionChange(index, "preRepair", "NO")}
-                        className="h-4 w-4 text-primary focus:ring-primary"
-                      />
+                    <td className="border-r border-border p-2">
+                      <button
+                        type="button"
+                        onClick={() => handleInspectionChange(index, "preRepair", "DAMAGED")}
+                        className={cn(
+                          "w-full rounded px-2 py-1.5 text-xs font-medium transition-colors",
+                          getInspectionButtonClass("DAMAGED", item.preRepair)
+                        )}
+                      >
+                        DAMAGED
+                      </button>
                     </td>
-                    <td className="border-r border-border p-2 text-center">
-                      <input
-                        type="radio"
-                        name={`pre-${index}`}
-                        checked={item.preRepair === "NA"}
-                        onChange={() => handleInspectionChange(index, "preRepair", "NA")}
-                        className="h-4 w-4 text-primary focus:ring-primary"
-                      />
-                    </td>
-                    {/* Post-Repair */}
-                    <td className="border-r border-border p-2 text-center">
-                      <input
-                        type="radio"
-                        name={`post-${index}`}
-                        checked={item.postRepair === "YES"}
-                        onChange={() => handleInspectionChange(index, "postRepair", "YES")}
-                        className="h-4 w-4 text-primary focus:ring-primary"
-                      />
-                    </td>
-                    <td className="border-r border-border p-2 text-center">
-                      <input
-                        type="radio"
-                        name={`post-${index}`}
-                        checked={item.postRepair === "NO"}
-                        onChange={() => handleInspectionChange(index, "postRepair", "NO")}
-                        className="h-4 w-4 text-primary focus:ring-primary"
-                      />
-                    </td>
-                    <td className="p-2 text-center">
-                      <input
-                        type="radio"
-                        name={`post-${index}`}
-                        checked={item.postRepair === "NA"}
-                        onChange={() => handleInspectionChange(index, "postRepair", "NA")}
-                        className="h-4 w-4 text-primary focus:ring-primary"
-                      />
+                    <td className="p-2">
+                      <button
+                        type="button"
+                        onClick={() => handleInspectionChange(index, "preRepair", "NA")}
+                        className={cn(
+                          "w-full rounded px-2 py-1.5 text-xs font-medium transition-colors",
+                          getInspectionButtonClass("NA", item.preRepair)
+                        )}
+                      >
+                        N/A
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -534,6 +626,87 @@ export default function NewTicketPage() {
             </table>
           </div>
         </div>
+
+        {/* Post-Repair Device Inspection - Only shown when status is COMPLETED */}
+        {formData.status === "COMPLETED" && (
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h2 className="mb-4 text-lg font-semibold text-foreground">
+              Post-Repair Device Inspection
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="border-r border-border bg-muted/50 p-2 text-left text-xs font-semibold text-foreground">
+                      Component
+                    </th>
+                    <th colSpan={3} className="bg-muted/50 p-2 text-center text-xs font-semibold text-foreground">
+                      Post-Repair Device Inspection
+                    </th>
+                  </tr>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="border-r border-border"></th>
+                    <th className="border-r border-border p-2 text-center text-xs font-medium text-foreground">
+                      GOOD
+                    </th>
+                    <th className="border-r border-border p-2 text-center text-xs font-medium text-foreground">
+                      DAMAGED
+                    </th>
+                    <th className="p-2 text-center text-xs font-medium text-foreground">
+                      N/A
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inspectionData.map((item, index) => (
+                    <tr key={index} className="border-b border-border hover:bg-muted/30">
+                      <td className="border-r border-border p-2 text-sm font-medium text-foreground">
+                        {item.label}
+                      </td>
+                      {/* Post-Repair */}
+                      <td className="border-r border-border p-2">
+                        <button
+                          type="button"
+                          onClick={() => handleInspectionChange(index, "postRepair", "GOOD")}
+                          className={cn(
+                            "w-full rounded px-2 py-1.5 text-xs font-medium transition-colors",
+                            getInspectionButtonClass("GOOD", item.postRepair)
+                          )}
+                        >
+                          GOOD
+                        </button>
+                      </td>
+                      <td className="border-r border-border p-2">
+                        <button
+                          type="button"
+                          onClick={() => handleInspectionChange(index, "postRepair", "DAMAGED")}
+                          className={cn(
+                            "w-full rounded px-2 py-1.5 text-xs font-medium transition-colors",
+                            getInspectionButtonClass("DAMAGED", item.postRepair)
+                          )}
+                        >
+                          DAMAGED
+                        </button>
+                      </td>
+                      <td className="p-2">
+                        <button
+                          type="button"
+                          onClick={() => handleInspectionChange(index, "postRepair", "NA")}
+                          className={cn(
+                            "w-full rounded px-2 py-1.5 text-xs font-medium transition-colors",
+                            getInspectionButtonClass("NA", item.postRepair)
+                          )}
+                        >
+                          N/A
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Liability Waiver Section */}
         <div className="rounded-lg border border-border bg-card p-6">
@@ -602,7 +775,7 @@ export default function NewTicketPage() {
                 className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
               />
               <span className="text-sm text-foreground">
-                <strong>Customer Acknowledgment:</strong> All of the information here (including the Pre-Repair Inspection) 
+                <strong>Customer Acknowledgment (Pre-Repair):</strong> All of the information here (including the Pre-Repair Inspection) 
                 is 100% correct to the best of my knowledge. By checking this box, I acknowledge that I have read and 
                 agree to the above Terms and Conditions.
               </span>
@@ -642,14 +815,23 @@ export default function NewTicketPage() {
           </Link>
           <button
             type="submit"
-            disabled={isSubmitting || !formData.customerName || !formData.contactNumber || !formData.waiverAcknowledged}
+            disabled={isSubmitting || !formData.waiverAcknowledged || (!formData.deviceInfo && !formData.service)}
             className={cn(
               "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50",
               isSubmitting && "cursor-not-allowed"
             )}
           >
-            <Save className="h-4 w-4" />
-            {isSubmitting ? "Creating..." : "Create Ticket & Waiver"}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Create Ticket & Waiver
+              </>
+            )}
           </button>
         </div>
       </form>
