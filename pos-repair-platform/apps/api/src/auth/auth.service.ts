@@ -39,6 +39,7 @@ export class AuthService {
 
       const owner = await this.prisma.owner.create({
         data: {
+          id: crypto.randomUUID(),
           email: storeEmail,
           password: hashedPassword,
         },
@@ -46,14 +47,17 @@ export class AuthService {
 
       const store = await this.prisma.store.create({
         data: {
+          id: crypto.randomUUID(),
           name: storeName,
           storeEmail: storeEmail,
           ownerId: owner.id,
+          updatedAt: new Date(),
         },
       });
 
       const employee = await this.prisma.employee.create({
         data: {
+          id: crypto.randomUUID(),
           name: ownerName,
           pin: hashedPassword,
           role: StoreRole.OWNER,

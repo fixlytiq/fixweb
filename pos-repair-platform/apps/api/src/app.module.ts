@@ -11,6 +11,7 @@ import { RefundsModule } from './refunds/refunds.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { SalesModule } from './sales/sales.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SalesModule } from './sales/sales.module';
     InventoryModule,
     TicketsModule,
     SalesModule,
+    CategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

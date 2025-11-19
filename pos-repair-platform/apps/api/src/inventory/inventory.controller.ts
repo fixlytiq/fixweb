@@ -32,8 +32,8 @@ export class InventoryController {
   }
 
   @Get()
-  findAll(@GetUser() user: UserPayload) {
-    return this.inventoryService.findAll(user);
+  findAll(@GetUser() user: UserPayload, @Query('categoryId') categoryId?: string) {
+    return this.inventoryService.findAll(user, categoryId);
   }
 
   @Get(':id')

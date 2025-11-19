@@ -101,6 +101,26 @@ export default function TicketDetailPage({
 
     setIsUpdating(true);
     try {
+      // Debug: Log what we're sending
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Assigning technician:', {
+          technicianId,
+          isEmpty: technicianId === '',
+          employeesAvailable: employees.length,
+          employeeIds: employees.map(e => e.id),
+        });
+      }
+
+      // Verify the technician exists in the employees list before sending
+      if (technicianId && technicianId !== '') {
+        const employeeExists = employees.some(emp => emp.id === technicianId);
+        if (!employeeExists) {
+          alert(`Selected technician is not available. Please refresh the page and try again.`);
+          setIsUpdating(false);
+          return;
+        }
+      }
+
       // Convert empty string to null for unassigning, otherwise use the ID
       const updateData: { technicianId: string | null } = {
         technicianId: technicianId === '' ? null : technicianId
@@ -109,7 +129,8 @@ export default function TicketDetailPage({
       setTicket(updated);
     } catch (err: any) {
       console.error("Error assigning technician:", err);
-      alert(err.message || "Failed to assign technician");
+      const errorMessage = err.message || "Failed to assign technician";
+      alert(errorMessage);
     } finally {
       setIsUpdating(false);
     }

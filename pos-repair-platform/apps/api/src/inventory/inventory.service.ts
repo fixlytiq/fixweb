@@ -26,25 +26,50 @@ export class InventoryService {
       throw new ConflictException(`SKU ${createStockItemDto.sku} already exists in this store`);
     }
 
+    // Validate category - it's required
+    const category = await this.prisma.category.findFirst({
+      where: {
+        id: createStockItemDto.categoryId,
+        storeId: user.storeId,
+      },
+    });
+
+    if (!category) {
+      throw new NotFoundException(`Category ${createStockItemDto.categoryId} not found in your store`);
+    }
+
     return this.prisma.stockItem.create({
       data: {
+        id: crypto.randomUUID(),
         storeId: user.storeId,
         sku: createStockItemDto.sku,
         name: createStockItemDto.name,
         description: createStockItemDto.description,
+        categoryId: createStockItemDto.categoryId,
         unitCost: createStockItemDto.unitCost,
         unitPrice: createStockItemDto.unitPrice,
         reorderPoint: createStockItemDto.reorderPoint,
         quantityOnHand: createStockItemDto.initialQuantity || 0,
+        updatedAt: new Date(),
+      },
+      include: {
+        Category: true,
       },
     });
   }
 
-  async findAll(user: UserPayload) {
+  async findAll(user: UserPayload, categoryId?: string) {
+    const where: any = { storeId: user.storeId };
+    
+    if (categoryId) {
+      where.categoryId = categoryId;
+    }
+
     return this.prisma.stockItem.findMany({
-      where: { storeId: user.storeId },
+      where,
       include: {
-        store: true,
+        Store: true,
+        Category: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -57,8 +82,9 @@ export class InventoryService {
         storeId: user.storeId,
       },
       include: {
-        store: true,
-        stockMovements: {
+        Store: true,
+        Category: true,
+        StockMovement: {
           orderBy: { createdAt: 'desc' },
           take: 10,
         },
@@ -85,17 +111,43 @@ export class InventoryService {
       throw new NotFoundException(`Stock item ${id} not found in your store`);
     }
 
+    // Validate category if provided
+    if (updateStockItemDto.categoryId !== undefined) {
+      if (updateStockItemDto.categoryId) {
+        const category = await this.prisma.category.findFirst({
+          where: {
+            id: updateStockItemDto.categoryId,
+            storeId: user.storeId,
+          },
+        });
+
+        if (!category) {
+          throw new NotFoundException(`Category ${updateStockItemDto.categoryId} not found in your store`);
+        }
+      }
+    }
+
     const updateData: any = {};
 
     if (updateStockItemDto.name !== undefined) updateData.name = updateStockItemDto.name;
     if (updateStockItemDto.description !== undefined) updateData.description = updateStockItemDto.description;
+    if (updateStockItemDto.categoryId !== undefined) {
+      updateData.categoryId = updateStockItemDto.categoryId || null;
+    }
     if (updateStockItemDto.unitCost !== undefined) updateData.unitCost = updateStockItemDto.unitCost;
     if (updateStockItemDto.unitPrice !== undefined) updateData.unitPrice = updateStockItemDto.unitPrice;
     if (updateStockItemDto.reorderPoint !== undefined) updateData.reorderPoint = updateStockItemDto.reorderPoint;
+    if (updateStockItemDto.quantityOnHand !== undefined) updateData.quantityOnHand = updateStockItemDto.quantityOnHand;
 
     return this.prisma.stockItem.update({
       where: { id },
-      data: updateData,
+      data: {
+        ...updateData,
+        updatedAt: new Date(),
+      },
+      include: {
+        Category: true,
+      },
     });
   }
 
@@ -118,6 +170,7 @@ export class InventoryService {
     // Create stock movement
     await this.prisma.stockMovement.create({
       data: {
+        id: crypto.randomUUID(),
         storeId: user.storeId,
         stockItemId: id,
         quantityChange: adjustStockDto.quantityChange,

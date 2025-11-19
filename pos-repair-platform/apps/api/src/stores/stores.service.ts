@@ -18,21 +18,23 @@ export class StoresService {
     // Get the employee to find the owner
     const employee = await this.prisma.employee.findUnique({
       where: { id: user.employeeId },
-      include: { store: { include: { owner: true } } },
+      include: { Store: { include: { Owner: true } } },
     });
 
     if (!employee) {
       throw new NotFoundException('Employee not found');
     }
 
-    const owner = employee.store.owner;
+    const owner = employee.Store.Owner;
 
     return this.prisma.store.create({
       data: {
+        id: crypto.randomUUID(),
         name: createStoreDto.name.trim(),
         storeEmail: createStoreDto.storeEmail,
         timezone: createStoreDto.timezone || 'America/Chicago',
         ownerId: owner.id,
+        updatedAt: new Date(),
       },
     });
   }
@@ -86,7 +88,10 @@ export class StoresService {
 
     return this.prisma.store.update({
       where: { id },
-      data: updateData,
+      data: {
+        ...updateData,
+        updatedAt: new Date(),
+      },
     });
   }
 

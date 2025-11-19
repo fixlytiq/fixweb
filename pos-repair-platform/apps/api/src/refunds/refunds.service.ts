@@ -31,27 +31,26 @@ export class RefundsService {
 
     const refund = await this.prisma.refund.create({
       data: {
+        id: crypto.randomUUID(),
         storeId: user.storeId,
         saleId: createRefundDto.saleId,
         refundedById: user.employeeId,
         amount: createRefundDto.amount,
         reason: createRefundDto.reason,
+        updatedAt: new Date(),
       },
       include: {
-        sale: true,
-        refundedBy: {
-          select: {
-            id: true,
-            name: true,
-            role: true,
-          },
-        },
+        Sale: true,
+        Store: true,
       },
     });
 
     await this.prisma.sale.update({
       where: { id: sale.id },
-      data: { paymentStatus: 'REFUNDED' },
+      data: { 
+        paymentStatus: 'REFUNDED',
+        updatedAt: new Date(),
+      },
     });
 
     return refund;
@@ -61,15 +60,8 @@ export class RefundsService {
     return this.prisma.refund.findMany({
       where: { storeId: user.storeId },
       include: {
-        sale: true,
-        refundedBy: {
-          select: {
-            id: true,
-            name: true,
-            role: true,
-          },
-        },
-        store: true,
+        Sale: true,
+        Store: true,
       },
       orderBy: { refundedAt: 'desc' },
     });
@@ -82,15 +74,8 @@ export class RefundsService {
         storeId: user.storeId,
       },
       include: {
-        sale: true,
-        refundedBy: {
-          select: {
-            id: true,
-            name: true,
-            role: true,
-          },
-        },
-        store: true,
+        Sale: true,
+        Store: true,
       },
     });
 

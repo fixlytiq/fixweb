@@ -25,10 +25,12 @@ export class TimeClockService {
 
     return this.prisma.timeClock.create({
       data: {
+        id: crypto.randomUUID(),
         storeId: user.storeId,
         employeeId: user.employeeId,
         clockInAt: new Date(),
         notes: clockInDto.notes,
+        updatedAt: new Date(),
       },
     });
   }
@@ -59,6 +61,7 @@ export class TimeClockService {
         clockOutAt,
         totalHours: totalHours.toFixed(2),
         notes: clockOutDto.notes || activeClock.notes,
+        updatedAt: new Date(),
       },
     });
   }
@@ -70,7 +73,7 @@ export class TimeClockService {
         storeId: user.storeId,
       },
       include: {
-        store: true,
+        Store: true,
       },
       orderBy: { clockInAt: 'desc' },
     });
@@ -84,7 +87,7 @@ export class TimeClockService {
         clockOutAt: null,
       },
       include: {
-        store: true,
+        Store: true,
       },
       orderBy: { clockInAt: 'desc' },
     });

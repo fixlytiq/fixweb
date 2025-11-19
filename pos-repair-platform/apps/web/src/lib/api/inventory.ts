@@ -1,11 +1,22 @@
 import { apiClient } from '../api-client';
 
+export interface Category {
+  id: string;
+  storeId: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface StockItem {
   id: string;
   storeId: string;
   sku: string;
   name: string;
   description?: string;
+  categoryId?: string;
+  category?: Category;
   unitCost?: number;
   unitPrice?: number;
   reorderPoint?: number;
@@ -18,6 +29,7 @@ export interface CreateStockItemDto {
   sku: string;
   name: string;
   description?: string;
+  categoryId?: string;
   unitCost?: number;
   unitPrice?: number;
   reorderPoint?: number;
@@ -25,9 +37,9 @@ export interface CreateStockItemDto {
 }
 
 export interface UpdateStockItemDto {
-  sku?: string;
   name?: string;
   description?: string;
+  categoryId?: string;
   unitCost?: number;
   unitPrice?: number;
   reorderPoint?: number;
@@ -41,9 +53,10 @@ export interface AdjustStockDto {
 }
 
 export const inventoryApi = {
-  findAll: async (): Promise<StockItem[]> => {
+  findAll: async (categoryId?: string): Promise<StockItem[]> => {
     // Store ID is automatically taken from JWT token
-    return apiClient.get<StockItem[]>('/inventory');
+    const params = categoryId ? { categoryId } : undefined;
+    return apiClient.get<StockItem[]>('/inventory', params);
   },
 
   findOne: async (id: string): Promise<StockItem> => {

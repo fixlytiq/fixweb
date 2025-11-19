@@ -11,6 +11,10 @@ export class UpdateStockItemDto {
   description?: string;
 
   @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   unitCost?: number;
@@ -24,5 +28,10 @@ export class UpdateStockItemDto {
   @IsNumber()
   @Min(0)
   reorderPoint?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  quantityOnHand?: number;
 }
 

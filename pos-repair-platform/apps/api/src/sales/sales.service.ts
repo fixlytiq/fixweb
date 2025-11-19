@@ -32,12 +32,11 @@ export class SalesService {
       }
     }
 
-    // If customerId is provided, verify the customer exists and belongs to the store
+    // If customerId is provided, verify the customer exists
     if (createSaleDto.customerId) {
       const customer = await this.prisma.customer.findFirst({
         where: {
           id: createSaleDto.customerId,
-          storeId: user.storeId,
         },
       });
 
@@ -50,6 +49,7 @@ export class SalesService {
       // Create sale without includes first to avoid relation errors
       const sale = await this.prisma.sale.create({
         data: {
+          id: crypto.randomUUID(),
           storeId: user.storeId,
           ticketId: createSaleDto.ticketId || undefined,
           customerId: createSaleDto.customerId || undefined,
@@ -59,6 +59,7 @@ export class SalesService {
           paymentStatus: createSaleDto.paymentStatus || PaymentStatus.PAID,
           reference: createSaleDto.reference || undefined,
           paidAt: createSaleDto.paymentStatus === PaymentStatus.PAID ? new Date() : undefined,
+          updatedAt: new Date(),
         },
       });
 
@@ -66,7 +67,7 @@ export class SalesService {
       return this.prisma.sale.findUnique({
         where: { id: sale.id },
         include: {
-          customer: {
+          Customer: {
             select: {
               id: true,
               firstName: true,
@@ -75,7 +76,7 @@ export class SalesService {
               phone: true,
             },
           },
-          ticket: {
+          Ticket: {
             select: {
               id: true,
               title: true,
@@ -125,7 +126,7 @@ export class SalesService {
     return this.prisma.sale.findMany({
       where,
       include: {
-        customer: {
+        Customer: {
           select: {
             id: true,
             firstName: true,
@@ -134,7 +135,7 @@ export class SalesService {
             phone: true,
           },
         },
-        ticket: {
+        Ticket: {
           select: {
             id: true,
             title: true,
@@ -153,7 +154,7 @@ export class SalesService {
         storeId: user.storeId,
       },
       include: {
-        customer: {
+        Customer: {
           select: {
             id: true,
             firstName: true,
@@ -162,7 +163,7 @@ export class SalesService {
             phone: true,
           },
         },
-        ticket: {
+        Ticket: {
           select: {
             id: true,
             title: true,
@@ -198,13 +199,20 @@ export class SalesService {
         storeId: user.storeId,
       },
       include: {
-        customer: {
+        Customer: {
           select: {
             id: true,
             firstName: true,
             lastName: true,
             email: true,
             phone: true,
+          },
+        },
+        Ticket: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
           },
         },
       },

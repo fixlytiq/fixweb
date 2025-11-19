@@ -13,6 +13,10 @@ export class CreateStockItemDto {
   @IsString()
   description?: string;
 
+  @IsString()
+  @MinLength(1)
+  categoryId!: string;
+
   @IsOptional()
   @IsNumber()
   @Min(0)

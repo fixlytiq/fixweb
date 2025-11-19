@@ -39,16 +39,19 @@ export class TicketsService {
 
       // Create ticket without includes first to avoid relation errors
       const ticket = await this.prisma.ticket.create({
-        data: ticketData,
+        data: {
+          ...ticketData,
+          id: crypto.randomUUID(),
+          updatedAt: new Date(),
+        },
       });
 
       // Then fetch with relations if needed
       return this.prisma.ticket.findUnique({
         where: { id: ticket.id },
         include: {
-          customer: true,
-          technician: true,
-          store: {
+          Customer: true,
+          Store: {
             select: {
               id: true,
               name: true,
@@ -102,7 +105,7 @@ export class TicketsService {
     return this.prisma.ticket.findMany({
       where,
       include: {
-        customer: {
+        Customer: {
           select: {
             id: true,
             firstName: true,
@@ -111,17 +114,10 @@ export class TicketsService {
             phone: true,
           },
         },
-        technician: true,
-        store: {
+        Store: {
           select: {
             id: true,
             name: true,
-          },
-        },
-        _count: {
-          select: {
-            notes: true,
-            waivers: true,
           },
         },
       },
@@ -138,23 +134,13 @@ export class TicketsService {
     const ticket = await this.prisma.ticket.findFirst({
       where,
       include: {
-        customer: true,
-        technician: true,
-        store: {
+        Customer: true,
+        Store: {
           select: {
             id: true,
             name: true,
             storeEmail: true,
           },
-        },
-        notes: {
-          orderBy: { createdAt: 'desc' },
-          include: {
-            author: true,
-          },
-        },
-        waivers: {
-          orderBy: { createdAt: 'desc' },
         },
       },
     });
@@ -208,18 +194,28 @@ export class TicketsService {
         updateData.technicianId = null;
       } else {
         // Validate technician exists and belongs to the store before assigning
-        const technician = await this.prisma.employee.findFirst({
-          where: {
-            id: updateTicketDto.technicianId,
-            storeId: user.storeId,
-          },
-        });
-        
-        if (!technician) {
-          throw new NotFoundException(`Technician with ID "${updateTicketDto.technicianId}" not found in your store`);
+        try {
+          const technician = await this.prisma.employee.findFirst({
+            where: {
+              id: updateTicketDto.technicianId,
+              storeId: user.storeId,
+            },
+          });
+          
+          if (!technician) {
+            throw new NotFoundException(`Technician with ID "${updateTicketDto.technicianId}" not found in your store`);
+          }
+          
+          updateData.technicianId = updateTicketDto.technicianId;
+        } catch (err: any) {
+          // If it's already a NotFoundException, re-throw it
+          if (err instanceof NotFoundException) {
+            throw err;
+          }
+          // Otherwise, log and throw a more descriptive error
+          console.error('Error validating technician:', err);
+          throw new BadRequestException(`Invalid technician ID: ${updateTicketDto.technicianId}. The technician may not exist or may not belong to your store.`);
         }
-        
-        updateData.technicianId = updateTicketDto.technicianId;
       }
     }
 
@@ -241,11 +237,13 @@ export class TicketsService {
         try {
           return await this.prisma.ticket.update({
             where: { id },
-            data: updateData,
+            data: {
+              ...updateData,
+              updatedAt: new Date(),
+            },
             include: {
-              customer: true,
-              technician: true,
-              store: {
+              Customer: true,
+        Store: {
                 select: {
                   id: true,
                   name: true,
@@ -263,12 +261,27 @@ export class TicketsService {
           if (error.code === 'P2002') {
             throw new BadRequestException('A ticket with this information already exists');
           }
+          if (error.code === 'P2003') {
+            // P2003 is a foreign key constraint violation
+            // The meta object contains information about which field failed
+            const meta = error.meta || {};
+            const fieldName = meta.field_name || meta.model_name || 'unknown field';
+            const targetModel = meta.model_name || 'referenced record';
+            
+            // Log detailed error for debugging
+            console.error('Foreign key constraint violation:', {
+              fieldName,
+              targetModel,
+              fullMeta: meta,
+              updateData: JSON.stringify(updateData, null, 2),
+            });
+            
+            throw new BadRequestException(
+              `Invalid reference: The ${fieldName} (${targetModel}) does not exist or does not belong to your store. Please check that the record exists.`
+            );
+          }
           if (error.meta?.target) {
             throw new BadRequestException(`Invalid foreign key reference: ${error.meta.target.join(', ')} not found`);
-          }
-          if (error.code === 'P2003') {
-            const fieldName = error.meta?.field_name || 'unknown field';
-            throw new BadRequestException(`Invalid foreign key reference: ${fieldName} not found. Please check that the referenced record exists.`);
           }
           if (error.code === 'P2025') {
             throw new NotFoundException('Record not found');
@@ -325,14 +338,14 @@ export class TicketsService {
 
     return this.prisma.ticketNote.create({
       data: {
+        id: crypto.randomUUID(),
         ticketId: ticket.id,
         authorId: user.employeeId,
         body: createNoteDto.body,
         visibility: createNoteDto.visibility || 'INTERNAL',
+        updatedAt: new Date(),
       },
-      include: {
-        author: true,
-      },
+      include: {},
     });
   }
 
@@ -344,9 +357,7 @@ export class TicketsService {
       where: {
         ticketId,
       },
-      include: {
-        author: true,
-      },
+      include: {},
       orderBy: { createdAt: 'desc' },
     });
   }

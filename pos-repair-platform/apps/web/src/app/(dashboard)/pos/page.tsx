@@ -73,13 +73,35 @@ export default function POSPage() {
             }
           } catch (err: any) {
             console.error("Error fetching ticket:", err);
-            // Don't block POS if ticket fetch fails
+            if (err.statusCode === 401 || err.message === "Unauthorized" || err.message?.includes("Unauthorized")) {
+              console.warn('POSPage: Unauthorized error when fetching ticket - clearing auth and redirecting');
+              // Clear tokens and redirect to login immediately
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('auth_user');
+              }
+              // Use window.location for immediate redirect
+              window.location.href = '/login';
+              return; // Exit early to prevent state updates
+            }
+            // Don't block POS if ticket fetch fails for other reasons
           } finally {
             setIsLoadingTicket(false);
           }
         }
       } catch (err: any) {
         console.error("Error fetching POS data:", err);
+        if (err.statusCode === 401 || err.message === "Unauthorized" || err.message?.includes("Unauthorized")) {
+          console.warn('POSPage: Unauthorized error - clearing auth and redirecting');
+          // Clear tokens and redirect to login immediately
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+          }
+          // Use window.location for immediate redirect
+          window.location.href = '/login';
+          return; // Exit early to prevent state updates
+        }
         setError(err.message || "Failed to load POS data");
       } finally {
         setIsLoading(false);
@@ -232,23 +254,23 @@ export default function POSPage() {
       <div className="lg:col-span-2 space-y-4 overflow-y-auto">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">POS Register</h1>
-            <p className="mt-2 text-muted-foreground">Select items to add to cart</p>
+            <h1 className="text-4xl font-bold tracking-tight text-foreground">POS Register</h1>
+            <p className="mt-2 text-base text-muted-foreground">Select items to add to cart</p>
           </div>
           {ticket && (
-            <Link
-              href={`/tickets/${ticket.id}`}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-            >
-              <TicketIcon className="h-4 w-4" />
-              View Ticket
-            </Link>
+        <Link
+          href={`/tickets/${ticket.id}`}
+          className="inline-flex items-center gap-2 rounded-xl border border-border/40 bg-gradient-to-br from-card to-card/80 px-3 py-2 text-sm font-medium text-foreground shadow-sm backdrop-blur-sm transition-all hover:border-border/60 hover:bg-accent hover:shadow-md hover:shadow-primary/5"
+        >
+          <TicketIcon className="h-4 w-4" />
+          View Ticket
+        </Link>
           )}
         </div>
 
         {/* Ticket Context Banner */}
         {ticket && (
-          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <div className="rounded-2xl border border-primary/40 bg-gradient-to-r from-primary/15 via-primary/10 to-primary/5 p-4 shadow-sm backdrop-blur-sm">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
@@ -290,12 +312,12 @@ export default function POSPage() {
         )}
 
         {/* Customer Selection - Placeholder */}
-        <div className="rounded-lg border border-border bg-card p-4">
+        <div className="rounded-2xl border border-border/40 bg-gradient-to-br from-card to-card/50 p-4 shadow-sm backdrop-blur-sm">
           <label className="mb-2 block text-sm font-medium text-foreground">Customer</label>
           <select
             value={selectedCustomer || ""}
             onChange={(e) => setSelectedCustomer(e.target.value || null)}
-            className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="h-11 w-full rounded-xl border border-border/40 bg-background/80 backdrop-blur-sm px-3 text-sm shadow-sm transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-0"
           >
             <option value="">Walk-in Customer</option>
             {/* TODO: Add customers API integration */}
@@ -310,7 +332,7 @@ export default function POSPage() {
             placeholder="Search products..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-10 w-full rounded-lg border border-border bg-background pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="h-11 w-full rounded-xl border border-border/40 bg-background/80 backdrop-blur-sm pl-10 pr-4 text-sm shadow-sm transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-0"
           />
         </div>
 
@@ -330,7 +352,7 @@ export default function POSPage() {
                 <div
                   key={item.id}
                   className={cn(
-                    "rounded-lg border border-border bg-card p-4 transition-all hover:shadow-md",
+                    "group relative overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-card to-card/50 p-4 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-border/60 hover:shadow-xl hover:shadow-primary/10",
                     isOutOfStock && "opacity-50"
                   )}
                 >
@@ -373,7 +395,7 @@ export default function POSPage() {
                   <button
                     onClick={() => addToCart(item)}
                     disabled={isOutOfStock}
-                    className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full rounded-xl bg-gradient-to-r from-primary to-primary/90 px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:from-primary/90 hover:to-primary/80 hover:shadow-lg hover:shadow-primary/30 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm disabled:hover:translate-y-0"
                   >
                     {isOutOfStock ? "Out of Stock" : "Add to Cart"}
                   </button>
@@ -385,7 +407,7 @@ export default function POSPage() {
       </div>
 
       {/* Cart Sidebar */}
-      <div className="flex flex-col space-y-4 rounded-lg border border-border bg-card p-6">
+      <div className="flex flex-col space-y-4 rounded-2xl border border-border/40 bg-gradient-to-br from-card to-card/50 p-6 shadow-sm backdrop-blur-sm">
         <div className="flex items-center gap-2 border-b border-border pb-4">
           <ShoppingCart className="h-5 w-5 text-primary" />
           <h2 className="text-xl font-semibold text-foreground">Cart</h2>
@@ -399,7 +421,7 @@ export default function POSPage() {
             cart.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center gap-3 rounded-lg border border-border p-3"
+                className="flex items-center gap-3 rounded-xl border border-border/40 bg-gradient-to-br from-background to-background/80 p-3 shadow-sm backdrop-blur-sm transition-all hover:border-border/60 hover:shadow-md hover:-translate-y-0.5"
               >
                 <div className="flex-1">
                   <p className="text-sm font-medium text-foreground">{item.name}</p>
@@ -461,7 +483,7 @@ export default function POSPage() {
             <button
               onClick={handleCheckout}
               disabled={isProcessing}
-              className="mt-4 w-full rounded-lg bg-primary px-4 py-3 text-base font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="mt-4 w-full rounded-xl bg-gradient-to-r from-primary to-primary/90 px-4 py-3 text-base font-medium text-primary-foreground shadow-sm transition-all hover:from-primary/90 hover:to-primary/80 hover:shadow-lg hover:shadow-primary/30 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm disabled:hover:translate-y-0 flex items-center justify-center gap-2"
             >
               {isProcessing ? (
                 <>

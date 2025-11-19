@@ -33,6 +33,7 @@ export class EmployeesService {
 
     return this.prisma.employee.create({
       data: {
+        id: crypto.randomUUID(),
         name: dto.name,
         pin: hashedPin,
         role: dto.role,

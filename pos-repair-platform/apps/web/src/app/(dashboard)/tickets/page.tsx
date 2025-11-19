@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Search, Filter, MoreVertical, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { ticketsApi, type Ticket, type TicketStatus } from "@/lib/api/tickets";
 import { employeesApi } from "@/lib/api/employees";
+import { useAuth } from "@/contexts/auth-context";
 
 const statusColors: Record<TicketStatus, string> = {
   RECEIVED: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
@@ -17,6 +19,8 @@ const statusColors: Record<TicketStatus, string> = {
 };
 
 export default function TicketsPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +30,14 @@ export default function TicketsPage() {
   const [technicianFilter, setTechnicianFilter] = useState<string>("ALL");
   const [employees, setEmployees] = useState<any[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      console.warn('TicketsPage: User not authenticated, redirecting to login');
+      router.push('/login');
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -51,8 +63,16 @@ export default function TicketsPage() {
         console.error("Error fetching tickets:", err);
         if (err.statusCode === 404 || err.message?.includes("Cannot GET")) {
           setError("Tickets endpoint not found. Please ensure the backend server has been restarted after adding the Tickets module.");
-        } else if (err.statusCode === 401) {
-          setError("Unauthorized. Please log in again.");
+        } else if (err.statusCode === 401 || err.message === "Unauthorized" || err.message?.includes("Unauthorized")) {
+          console.warn('TicketsPage: Unauthorized error - clearing auth and redirecting');
+          // Clear tokens and redirect to login immediately
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+          }
+          // Use window.location for immediate redirect
+          window.location.href = '/login';
+          return; // Exit early to prevent state updates
         } else {
           setError(err.message || "Failed to load tickets");
         }
@@ -61,8 +81,15 @@ export default function TicketsPage() {
       }
     };
 
-    fetchData();
-  }, [statusFilter, technicianFilter]);
+    // Only fetch data if authenticated
+    if (isAuthenticated && !authLoading) {
+      fetchData();
+    } else if (!authLoading && !isAuthenticated) {
+      // If auth is done loading and user is not authenticated, show error
+      setError("Please log in to view tickets");
+      setIsLoading(false);
+    }
+  }, [statusFilter, technicianFilter, isAuthenticated, authLoading]);
 
   // Filter tickets by search query
   useEffect(() => {
@@ -95,6 +122,23 @@ export default function TicketsPage() {
     return `${firstName} ${lastName}`.trim() || "Unknown";
   };
 
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
@@ -111,14 +155,14 @@ export default function TicketsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Tickets</h1>
-          <p className="mt-2 text-muted-foreground">
+          <h1 className="text-4xl font-bold tracking-tight text-foreground">Tickets</h1>
+          <p className="mt-2 text-base text-muted-foreground">
             Manage repair tickets and track their status
           </p>
         </div>
         <Link
           href="/tickets/new"
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-primary/90 px-4 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:from-primary/90 hover:to-primary/80 hover:shadow-lg hover:shadow-primary/30 hover:-translate-y-0.5"
         >
           <Plus className="h-4 w-4" />
           New Ticket
@@ -144,12 +188,12 @@ export default function TicketsPage() {
               placeholder="Search tickets by title, description, customer, or technician..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-10 w-full rounded-lg border border-border bg-background pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              className="h-11 w-full rounded-xl border border-border/40 bg-background/80 backdrop-blur-sm pl-10 pr-4 text-sm shadow-sm transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-0"
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium transition-colors hover:bg-accent"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border/40 bg-gradient-to-br from-background to-background/80 px-4 text-sm font-medium shadow-sm backdrop-blur-sm transition-all hover:border-border/60 hover:bg-accent hover:shadow-md hover:shadow-primary/5"
           >
             <Filter className="h-4 w-4" />
             Filters
@@ -157,7 +201,7 @@ export default function TicketsPage() {
         </div>
 
         {showFilters && (
-          <div className="flex flex-wrap gap-4 rounded-lg border border-border bg-card p-4">
+          <div className="flex flex-wrap gap-4 rounded-2xl border border-border/40 bg-gradient-to-br from-card to-card/50 p-4 shadow-sm backdrop-blur-sm">
             <div className="flex-1 min-w-[200px]">
               <label className="mb-2 block text-sm font-medium text-foreground">Status</label>
               <select
@@ -196,7 +240,7 @@ export default function TicketsPage() {
       </div>
 
       {/* Tickets Table */}
-      <div className="rounded-lg border border-border bg-card shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-card to-card/50 shadow-sm backdrop-blur-sm">
         {filteredTickets.length === 0 ? (
           <div className="p-12 text-center">
             <p className="text-muted-foreground">
@@ -235,7 +279,7 @@ export default function TicketsPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredTickets.map((ticket) => (
-                  <tr key={ticket.id} className="hover:bg-muted/50 transition-colors">
+                  <tr key={ticket.id} className="transition-all hover:bg-muted/20 hover:shadow-sm">
                     <td className="px-6 py-4">
                       <div>
                         <Link

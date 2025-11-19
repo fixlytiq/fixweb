@@ -1,0 +1,499 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id          String      @id
+  storeId     String
+  name        String
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime
+  Store       Store       @relation(fields: [storeId], references: [id])
+  StockItem   StockItem[]
+
+  @@unique([storeId, name])
+}
+
+model Customer {
+  id        String   @id
+  firstName String?
+  lastName  String?
+  email     String?
+  phone     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Sale      Sale[]
+  Ticket    Ticket[]
+
+  @@index([email])
+  @@index([phone])
+}
+
+model Dispute {
+  id                              String            @id
+  storeId                         String
+  ticketId                        String?
+  raisedById                      String?
+  assignedToId                    String?
+  status                          DisputeStatus     @default(OPEN)
+  summary                         String
+  resolution                      String?
+  openedAt                        DateTime          @default(now())
+  resolvedAt                      DateTime?
+  createdAt                       DateTime          @default(now())
+  updatedAt                       DateTime
+  User_Dispute_assignedToIdToUser User?             @relation("Dispute_assignedToIdToUser", fields: [assignedToId], references: [id])
+  User_Dispute_raisedByIdToUser   User?             @relation("Dispute_raisedByIdToUser", fields: [raisedById], references: [id])
+  Store                           Store             @relation(fields: [storeId], references: [id])
+  Ticket                          Ticket?           @relation(fields: [ticketId], references: [id])
+  DisputeEvidence                 DisputeEvidence[]
+
+  @@index([status])
+  @@index([storeId])
+}
+
+model DisputeEvidence {
+  id          String              @id
+  disputeId   String
+  type        DisputeEvidenceType @default(NOTE)
+  url         String?
+  description String?
+  createdAt   DateTime            @default(now())
+  Dispute     Dispute             @relation(fields: [disputeId], references: [id])
+
+  @@index([disputeId])
+}
+
+model Employee {
+  id      String    @id
+  name    String
+  pin     String
+  role    StoreRole
+  storeId String
+  Store   Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, pin])
+}
+
+model Membership {
+  id             String           @id
+  userId         String
+  organizationId String
+  role           OrganizationRole
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  Organization   Organization     @relation(fields: [organizationId], references: [id])
+  User           User             @relation(fields: [userId], references: [id])
+  StoreUserRole  StoreUserRole[]
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+model Organization {
+  id         String       @id
+  name       String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime
+  Membership Membership[]
+
+  @@index([name])
+}
+
+model Owner {
+  id       String  @id
+  email    String  @unique
+  password String
+  Store    Store[]
+}
+
+model PurchaseOrder {
+  id                String              @id
+  storeId           String
+  vendorId          String?
+  status            PurchaseOrderStatus @default(DRAFT)
+  reference         String?
+  notes             String?
+  expectedAt        DateTime?
+  orderedAt         DateTime?
+  receivedAt        DateTime?
+  subtotal          Decimal?            @db.Decimal(10, 2)
+  tax               Decimal?            @db.Decimal(10, 2)
+  total             Decimal?            @db.Decimal(10, 2)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  Store             Store               @relation(fields: [storeId], references: [id])
+  Vendor            Vendor?             @relation(fields: [vendorId], references: [id])
+  PurchaseOrderItem PurchaseOrderItem[]
+  StockMovement     StockMovement[]
+
+  @@index([storeId])
+  @@index([vendorId])
+}
+
+model PurchaseOrderItem {
+  id              String          @id
+  purchaseOrderId String
+  stockItemId     String?
+  sku             String
+  description     String?
+  quantity        Int
+  unitCost        Decimal?        @db.Decimal(10, 2)
+  totalCost       Decimal?        @db.Decimal(10, 2)
+  metadata        Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+  PurchaseOrder   PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id])
+  StockItem       StockItem?      @relation(fields: [stockItemId], references: [id])
+  StockMovement   StockMovement[]
+
+  @@index([purchaseOrderId])
+  @@index([stockItemId])
+}
+
+model Refund {
+  id           String   @id
+  storeId      String
+  saleId       String
+  refundedById String
+  amount       Decimal  @db.Decimal(10, 2)
+  reason       String?
+  refundedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+  Sale         Sale     @relation(fields: [saleId], references: [id])
+  Store        Store    @relation(fields: [storeId], references: [id])
+
+  @@index([refundedById])
+  @@index([saleId])
+  @@index([storeId])
+}
+
+model Sale {
+  id            String         @id
+  storeId       String
+  ticketId      String?
+  customerId    String?
+  paymentStatus PaymentStatus  @default(PAID)
+  reference     String?
+  subtotal      Decimal?       @db.Decimal(10, 2)
+  tax           Decimal?       @db.Decimal(10, 2)
+  total         Decimal?       @db.Decimal(10, 2)
+  paidAt        DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime
+  Refund        Refund[]
+  Customer      Customer?      @relation(fields: [customerId], references: [id])
+  Store         Store          @relation(fields: [storeId], references: [id])
+  Ticket        Ticket?        @relation(fields: [ticketId], references: [id])
+  SaleLineItem  SaleLineItem[]
+
+  @@index([customerId])
+  @@index([storeId])
+  @@index([ticketId])
+}
+
+model SaleLineItem {
+  id            String          @id
+  saleId        String
+  stockItemId   String?
+  description   String
+  quantity      Int
+  unitPrice     Decimal         @db.Decimal(10, 2)
+  total         Decimal         @db.Decimal(10, 2)
+  metadata      Json?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  Sale          Sale            @relation(fields: [saleId], references: [id])
+  StockItem     StockItem?      @relation(fields: [stockItemId], references: [id])
+  StockMovement StockMovement[]
+
+  @@index([saleId])
+  @@index([stockItemId])
+}
+
+model StockItem {
+  id                String              @id
+  storeId           String
+  sku               String
+  name              String
+  description       String?
+  unitCost          Decimal?            @db.Decimal(10, 2)
+  unitPrice         Decimal?            @db.Decimal(10, 2)
+  reorderPoint      Int?
+  quantityOnHand    Int                 @default(0)
+  metadata          Json?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  categoryId        String?
+  PurchaseOrderItem PurchaseOrderItem[]
+  SaleLineItem      SaleLineItem[]
+  Category          Category?           @relation(fields: [categoryId], references: [id])
+  Store             Store               @relation(fields: [storeId], references: [id])
+  StockMovement     StockMovement[]
+
+  @@unique([storeId, sku])
+  @@index([categoryId])
+  @@index([storeId])
+}
+
+model StockMovement {
+  id                  String              @id
+  storeId             String
+  stockItemId         String
+  quantityChange      Int
+  reason              StockMovementReason
+  note                String?
+  ticketId            String?
+  purchaseOrderItemId String?
+  saleLineItemId      String?
+  createdAt           DateTime            @default(now())
+  purchaseOrderId     String?
+  PurchaseOrder       PurchaseOrder?      @relation(fields: [purchaseOrderId], references: [id])
+  PurchaseOrderItem   PurchaseOrderItem?  @relation(fields: [purchaseOrderItemId], references: [id])
+  SaleLineItem        SaleLineItem?       @relation(fields: [saleLineItemId], references: [id])
+  StockItem           StockItem           @relation(fields: [stockItemId], references: [id])
+  Store               Store               @relation(fields: [storeId], references: [id])
+  Ticket              Ticket?             @relation(fields: [ticketId], references: [id])
+
+  @@index([stockItemId])
+  @@index([storeId])
+  @@index([ticketId])
+}
+
+model Store {
+  id             String           @id
+  name           String
+  timezone       String           @default("America/Chicago")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  storeEmail     String           @unique
+  ownerId        String
+  Category       Category[]
+  Dispute        Dispute[]
+  Employee       Employee[]
+  PurchaseOrder  PurchaseOrder[]
+  Refund         Refund[]
+  Sale           Sale[]
+  StockItem      StockItem[]
+  StockMovement  StockMovement[]
+  Owner          Owner            @relation(fields: [ownerId], references: [id])
+  StoreUserRole  StoreUserRole[]
+  Ticket         Ticket[]
+  TimeClock      TimeClock[]
+  Vendor         Vendor[]
+  WaiverTemplate WaiverTemplate[]
+}
+
+model StoreUserRole {
+  id           String     @id
+  membershipId String
+  storeId      String
+  role         StoreRole
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime
+  Membership   Membership @relation(fields: [membershipId], references: [id])
+  Store        Store      @relation(fields: [storeId], references: [id])
+
+  @@unique([membershipId, storeId, role])
+  @@index([storeId])
+}
+
+model Ticket {
+  id            String          @id
+  storeId       String
+  customerId    String?
+  technicianId  String?
+  title         String
+  description   String?
+  status        TicketStatus    @default(RECEIVED)
+  estimatedCost Decimal?        @db.Decimal(10, 2)
+  subtotal      Decimal?        @db.Decimal(10, 2)
+  tax           Decimal?        @db.Decimal(10, 2)
+  total         Decimal?        @db.Decimal(10, 2)
+  scheduledAt   DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  cancelledAt   DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  Dispute       Dispute[]
+  Sale          Sale[]
+  StockMovement StockMovement[]
+  Customer      Customer?       @relation(fields: [customerId], references: [id])
+  Store         Store           @relation(fields: [storeId], references: [id])
+  User          User?           @relation(fields: [technicianId], references: [id])
+  TicketNote    TicketNote[]
+  TicketWaiver  TicketWaiver[]
+
+  @@index([status])
+  @@index([storeId])
+}
+
+model TicketNote {
+  id         String               @id
+  ticketId   String
+  authorId   String?
+  visibility TicketNoteVisibility @default(INTERNAL)
+  body       String
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime
+  User       User?                @relation(fields: [authorId], references: [id])
+  Ticket     Ticket               @relation(fields: [ticketId], references: [id])
+
+  @@index([authorId])
+  @@index([ticketId])
+}
+
+model TicketWaiver {
+  id             String          @id
+  ticketId       String
+  templateId     String?
+  signedBy       String?
+  signatureUrl   String?
+  payload        Json?
+  signedAt       DateTime?
+  createdAt      DateTime        @default(now())
+  WaiverTemplate WaiverTemplate? @relation(fields: [templateId], references: [id])
+  Ticket         Ticket          @relation(fields: [ticketId], references: [id])
+
+  @@index([templateId])
+  @@index([ticketId])
+}
+
+model TimeClock {
+  id         String    @id
+  storeId    String
+  clockInAt  DateTime
+  clockOutAt DateTime?
+  breakStart DateTime?
+  breakEnd   DateTime?
+  totalHours Decimal?  @db.Decimal(10, 2)
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime
+  employeeId String
+  Store      Store     @relation(fields: [storeId], references: [id])
+
+  @@index([clockInAt])
+  @@index([storeId])
+}
+
+model User {
+  id                                 String       @id
+  email                              String       @unique
+  passwordHash                       String
+  firstName                          String?
+  lastName                           String?
+  phone                              String?
+  createdAt                          DateTime     @default(now())
+  updatedAt                          DateTime
+  Dispute_Dispute_assignedToIdToUser Dispute[]    @relation("Dispute_assignedToIdToUser")
+  Dispute_Dispute_raisedByIdToUser   Dispute[]    @relation("Dispute_raisedByIdToUser")
+  Membership                         Membership[]
+  Ticket                             Ticket[]
+  TicketNote                         TicketNote[]
+}
+
+model Vendor {
+  id            String          @id
+  name          String
+  contactName   String?
+  email         String?
+  phone         String?
+  website       String?
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  storeId       String
+  PurchaseOrder PurchaseOrder[]
+  Store         Store           @relation(fields: [storeId], references: [id])
+}
+
+model WaiverTemplate {
+  id           String         @id
+  name         String
+  content      String
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  storeId      String
+  TicketWaiver TicketWaiver[]
+  Store        Store          @relation(fields: [storeId], references: [id])
+}
+
+enum DisputeEvidenceType {
+  NOTE
+  DOCUMENT
+  IMAGE
+  AUDIO
+  OTHER
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  STAFF
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  PAID
+  REFUNDED
+  VOID
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SUBMITTED
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+enum StockMovementReason {
+  SALE
+  PURCHASE
+  ADJUSTMENT
+  RETURN
+  TRANSFER
+  RESERVATION
+  RELEASE
+}
+
+enum StoreRole {
+  OWNER
+  MANAGER
+  TECHNICIAN
+  CASHIER
+  VIEWER
+}
+
+enum TicketNoteVisibility {
+  INTERNAL
+  CUSTOMER
+}
+
+enum TicketStatus {
+  RECEIVED
+  IN_PROGRESS
+  AWAITING_PARTS
+  READY
+  COMPLETED
+  CANCELLED
+}
