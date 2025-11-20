@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Edit, Clock, User, Calendar, Loader2, AlertCircle, Trash2, CreditCard, DollarSign, CheckCircle, XCircle, AlertCircle as AlertCircleIcon } from "lucide-react";
+import { ArrowLeft, Edit, Clock, User, Calendar, Loader2, AlertCircle, Trash2, CreditCard, DollarSign, CheckCircle, XCircle, AlertCircle as AlertCircleIcon, Package, Wrench, CheckCircle2 } from "lucide-react";
 import { ticketsApi, type Ticket, type TicketStatus, type TicketNote } from "@/lib/api/tickets";
 import { employeesApi, type Employee } from "@/lib/api/employees";
 import { salesApi, type Sale } from "@/lib/api/sales";
@@ -12,13 +12,48 @@ import { TicketStatusUpdater } from "@/components/ticket-status-updater";
 import { TicketNotes } from "@/components/ticket-notes";
 import { useAuth } from "@/contexts/auth-context";
 
-const statusColors: Record<TicketStatus, string> = {
-  RECEIVED: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
-  IN_PROGRESS: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  AWAITING_PARTS: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-  READY: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  COMPLETED: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-  CANCELLED: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+const statusConfig: Record<TicketStatus, { 
+  label: string; 
+  color: string; 
+  icon: typeof Package;
+  description: string;
+}> = {
+  RECEIVED: {
+    label: "Received",
+    color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+    icon: Package,
+    description: "Device received, awaiting inspection"
+  },
+  IN_PROGRESS: {
+    label: "In Progress",
+    color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    icon: Wrench,
+    description: "Repair work in progress"
+  },
+  AWAITING_PARTS: {
+    label: "Awaiting Parts",
+    color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+    icon: Clock,
+    description: "Waiting for parts to arrive"
+  },
+  READY: {
+    label: "Ready for Pickup",
+    color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    icon: CheckCircle2,
+    description: "Repair complete, ready for customer"
+  },
+  COMPLETED: {
+    label: "Completed",
+    color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+    icon: CheckCircle2,
+    description: "Ticket fully completed and closed"
+  },
+  CANCELLED: {
+    label: "Cancelled",
+    color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+    icon: XCircle,
+    description: "Ticket has been cancelled"
+  },
 };
 
 export default function TicketDetailPage({
@@ -194,7 +229,7 @@ export default function TicketDetailPage({
   }
 
   const formatStatus = (status: TicketStatus) => {
-    return status.replace("_", " ");
+    return statusConfig[status].label;
   };
 
   const getCustomerName = () => {
@@ -225,10 +260,15 @@ export default function TicketDetailPage({
               </h1>
               <span
                 className={cn(
-                  "inline-flex rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                  statusColors[ticket.status]
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                  statusConfig[ticket.status].color
                 )}
+                title={statusConfig[ticket.status].description}
               >
+                {(() => {
+                  const Icon = statusConfig[ticket.status].icon;
+                  return <Icon className="h-3.5 w-3.5" />;
+                })()}
                 {formatStatus(ticket.status)}
               </span>
             </div>
@@ -327,15 +367,21 @@ export default function TicketDetailPage({
               <div className="flex items-start gap-4">
                 <div className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-full",
-                  statusColors[ticket.status]
+                  statusConfig[ticket.status].color
                 )}>
-                  <Clock className="h-4 w-4" />
+                  {(() => {
+                    const Icon = statusConfig[ticket.status].icon;
+                    return <Icon className="h-4 w-4" />;
+                  })()}
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-foreground">
                     Status: {formatStatus(ticket.status)}
                   </p>
                   <p className="text-xs text-muted-foreground">
+                    {statusConfig[ticket.status].description}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Last updated {new Date(ticket.updatedAt).toLocaleString()}
                   </p>
                 </div>

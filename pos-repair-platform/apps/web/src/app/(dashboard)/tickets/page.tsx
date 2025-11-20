@@ -2,20 +2,55 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Filter, MoreVertical, Loader2, AlertCircle } from "lucide-react";
+import { Plus, Search, Filter, MoreVertical, Loader2, AlertCircle, Package, Wrench, Clock, CheckCircle2, XCircle, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { ticketsApi, type Ticket, type TicketStatus } from "@/lib/api/tickets";
 import { employeesApi } from "@/lib/api/employees";
 import { useAuth } from "@/contexts/auth-context";
 
-const statusColors: Record<TicketStatus, string> = {
-  RECEIVED: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
-  IN_PROGRESS: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  AWAITING_PARTS: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-  READY: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  COMPLETED: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-  CANCELLED: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+const statusConfig: Record<TicketStatus, { 
+  label: string; 
+  color: string; 
+  icon: typeof Package;
+  description: string;
+}> = {
+  RECEIVED: {
+    label: "Received",
+    color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+    icon: Package,
+    description: "Device received, awaiting inspection"
+  },
+  IN_PROGRESS: {
+    label: "In Progress",
+    color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    icon: Wrench,
+    description: "Repair work in progress"
+  },
+  AWAITING_PARTS: {
+    label: "Awaiting Parts",
+    color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+    icon: Clock,
+    description: "Waiting for parts to arrive"
+  },
+  READY: {
+    label: "Ready for Pickup",
+    color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    icon: CheckCircle2,
+    description: "Repair complete, ready for customer"
+  },
+  COMPLETED: {
+    label: "Completed",
+    color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+    icon: CheckCircle2,
+    description: "Ticket fully completed and closed"
+  },
+  CANCELLED: {
+    label: "Cancelled",
+    color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+    icon: XCircle,
+    description: "Ticket has been cancelled"
+  },
 };
 
 export default function TicketsPage() {
@@ -112,7 +147,7 @@ export default function TicketsPage() {
   }, [searchQuery, tickets]);
 
   const formatStatus = (status: TicketStatus) => {
-    return status.replace("_", " ");
+    return statusConfig[status].label;
   };
 
   const getCustomerName = (ticket: Ticket) => {
@@ -210,12 +245,12 @@ export default function TicketsPage() {
                 className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="ALL">All Statuses</option>
-                <option value="RECEIVED">Received</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="AWAITING_PARTS">Awaiting Parts</option>
-                <option value="READY">Ready</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
+                <option value="RECEIVED">📦 Received</option>
+                <option value="IN_PROGRESS">🔧 In Progress</option>
+                <option value="AWAITING_PARTS">⏳ Awaiting Parts</option>
+                <option value="READY">✅ Ready for Pickup</option>
+                <option value="COMPLETED">✔️ Completed</option>
+                <option value="CANCELLED">❌ Cancelled</option>
               </select>
             </div>
             {employees.length > 0 && (
@@ -313,14 +348,21 @@ export default function TicketsPage() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={cn(
-                          "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium",
-                          statusColors[ticket.status]
-                        )}
-                      >
-                        {formatStatus(ticket.status)}
-                      </span>
+                      <div className="group relative">
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition-all",
+                            statusConfig[ticket.status].color
+                          )}
+                          title={statusConfig[ticket.status].description}
+                        >
+                          {(() => {
+                            const Icon = statusConfig[ticket.status].icon;
+                            return <Icon className="h-3 w-3" />;
+                          })()}
+                          {formatStatus(ticket.status)}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       {ticket.total ? (
