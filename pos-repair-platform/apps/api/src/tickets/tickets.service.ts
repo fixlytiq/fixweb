@@ -26,10 +26,11 @@ export class TicketsService {
         ticketData.customerId = createTicketDto.customerId;
       }
 
-      // Only add technicianId if provided or if user is a technician
-      const technicianId = createTicketDto.technicianId || (user.role === StoreRole.TECHNICIAN ? user.employeeId : undefined);
-      if (technicianId) {
-        ticketData.technicianId = technicianId;
+      // Only add technicianId if explicitly provided
+      // Note: technicianId references Employee.id
+      // Auto-assignment is handled separately after ticket creation
+      if (createTicketDto.technicianId) {
+        ticketData.technicianId = createTicketDto.technicianId;
       }
 
       // Only add scheduledAt if provided
@@ -57,7 +58,14 @@ export class TicketsService {
               name: true,
             },
           },
-        },
+          Employee: {
+            select: {
+              id: true,
+              name: true,
+              role: true,
+            },
+          },
+        } as any,
       });
     } catch (error: any) {
       console.error('Error creating ticket:', error);
@@ -120,7 +128,14 @@ export class TicketsService {
             name: true,
           },
         },
-      },
+        Employee: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+      } as any,
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -142,7 +157,14 @@ export class TicketsService {
             storeEmail: true,
           },
         },
-      },
+        Employee: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+      } as any,
     });
 
     if (!ticket) {
@@ -190,7 +212,7 @@ export class TicketsService {
       }
       
       // Handle unassigning (empty string or null)
-      if (updateTicketDto.technicianId === '' || updateTicketDto.technicianId === null || updateTicketDto.technicianId === undefined) {
+      if (!updateTicketDto.technicianId) {
         updateData.technicianId = null;
       } else {
         // Validate technician exists and belongs to the store before assigning
@@ -243,13 +265,20 @@ export class TicketsService {
             },
             include: {
               Customer: true,
-        Store: {
+              Store: {
                 select: {
                   id: true,
                   name: true,
                 },
               },
-            },
+              Employee: {
+                select: {
+                  id: true,
+                  name: true,
+                  role: true,
+                },
+              },
+            } as any,
           });
         } catch (error: any) {
           console.error('Error updating ticket:', error);
@@ -345,7 +374,6 @@ export class TicketsService {
         visibility: createNoteDto.visibility || 'INTERNAL',
         updatedAt: new Date(),
       },
-      include: {},
     });
   }
 

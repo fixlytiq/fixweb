@@ -131,40 +131,39 @@ export default function TicketDetailPage({
     }
   };
 
-  const handleTechnicianChange = async (technicianId: string) => {
-    if (!ticket) return;
+  const handleAssignToMe = async () => {
+    if (!ticket || !user) return;
 
     setIsUpdating(true);
     try {
-      // Debug: Log what we're sending
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Assigning technician:', {
-          technicianId,
-          isEmpty: technicianId === '',
-          employeesAvailable: employees.length,
-          employeeIds: employees.map(e => e.id),
-        });
-      }
-
-      // Verify the technician exists in the employees list before sending
-      if (technicianId && technicianId !== '') {
-        const employeeExists = employees.some(emp => emp.id === technicianId);
-        if (!employeeExists) {
-          alert(`Selected technician is not available. Please refresh the page and try again.`);
-          setIsUpdating(false);
-          return;
-        }
-      }
-
-      // Convert empty string to null for unassigning, otherwise use the ID
-      const updateData: { technicianId: string | null } = {
-        technicianId: technicianId === '' ? null : technicianId
+      // Automatically assign the logged-in user
+      const updateData: { technicianId: string } = {
+        technicianId: user.employeeId
       };
       const updated = await ticketsApi.update(ticket.id, updateData);
       setTicket(updated);
     } catch (err: any) {
       console.error("Error assigning technician:", err);
       const errorMessage = err.message || "Failed to assign technician";
+      alert(errorMessage);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleUnassign = async () => {
+    if (!ticket) return;
+
+    setIsUpdating(true);
+    try {
+      const updateData: { technicianId: null } = {
+        technicianId: null
+      };
+      const updated = await ticketsApi.update(ticket.id, updateData);
+      setTicket(updated);
+    } catch (err: any) {
+      console.error("Error unassigning technician:", err);
+      const errorMessage = err.message || "Failed to unassign technician";
       alert(errorMessage);
     } finally {
       setIsUpdating(false);
@@ -448,29 +447,37 @@ export default function TicketDetailPage({
           {/* Assignment */}
           <div className="rounded-lg border border-border bg-card p-6">
             <h2 className="mb-4 text-lg font-semibold text-foreground">Assignment</h2>
-            {canAssignTechnician && employees.length > 0 ? (
-              <select
-                value={ticket.technicianId || ""}
-                onChange={(e) => handleTechnicianChange(e.target.value)}
-                disabled={isUpdating}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-              >
-                <option value="">Unassigned</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.name} ({emp.role})
-                  </option>
-                ))}
-              </select>
-            ) : ticket.technician ? (
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <User className="h-5 w-5" />
+            {ticket.technician ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <User className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">{ticket.technician.name}</p>
+                    <p className="text-sm text-muted-foreground">{ticket.technician.role}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-foreground">{ticket.technician.name}</p>
-                  <p className="text-sm text-muted-foreground">{ticket.technician.role}</p>
-                </div>
+                {canAssignTechnician && (
+                  <button
+                    onClick={handleUnassign}
+                    disabled={isUpdating}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
+                  >
+                    {isUpdating ? "Unassigning..." : "Unassign"}
+                  </button>
+                )}
+              </div>
+            ) : canAssignTechnician && user ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">This ticket is currently unassigned.</p>
+                <button
+                  onClick={handleAssignToMe}
+                  disabled={isUpdating}
+                  className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isUpdating ? "Assigning..." : "Assign to Me"}
+                </button>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">Unassigned</p>

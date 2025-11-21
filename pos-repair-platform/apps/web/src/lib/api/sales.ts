@@ -29,24 +29,21 @@ export const salesApi = {
    * Get all sales for the current store
    */
   findAll: async (): Promise<Sale[]> => {
-    const response = await apiClient.get<Sale[]>('/sales');
-    return response.data;
+    return await apiClient.get<Sale[]>('/sales');
   },
 
   /**
    * Get a single sale by ID
    */
   findOne: async (id: string): Promise<Sale> => {
-    const response = await apiClient.get<Sale>(`/sales/${id}`);
-    return response.data;
+    return await apiClient.get<Sale>(`/sales/${id}`);
   },
 
   /**
    * Get all sales for a specific ticket
    */
   findByTicketId: async (ticketId: string): Promise<Sale[]> => {
-    const response = await apiClient.get<Sale[]>(`/sales?ticketId=${ticketId}`);
-    return response.data;
+    return await apiClient.get<Sale[]>(`/sales?ticketId=${ticketId}`);
   },
 
   /**
@@ -61,8 +58,7 @@ export const salesApi = {
     paymentStatus?: PaymentStatus;
     reference?: string;
   }): Promise<Sale> => {
-    const response = await apiClient.post<Sale>('/sales', data);
-    return response.data;
+    return await apiClient.post<Sale>('/sales', data);
   },
 };
 

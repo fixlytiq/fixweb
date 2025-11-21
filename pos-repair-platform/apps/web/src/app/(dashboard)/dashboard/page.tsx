@@ -6,7 +6,7 @@ import { inventoryApi, type StockItem } from "@/lib/api/inventory";
 import { storesApi, type Store } from "@/lib/api/stores";
 import { ticketsApi, type Ticket, type TicketStatus } from "@/lib/api/tickets";
 import { salesApi, type Sale } from "@/lib/api/sales";
-import { Ticket, Package, DollarSign, AlertTriangle, TrendingUp, Loader2 } from "lucide-react";
+import { Ticket as TicketIcon, Package, DollarSign, AlertTriangle, TrendingUp, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -135,7 +135,7 @@ export default function DashboardPage() {
     {
       title: "Open Tickets",
       value: stats.openTickets,
-      icon: Ticket,
+      icon: TicketIcon,
       change: stats.ticketChange,
       trend: parseFloat(stats.ticketChange) >= 0 ? "up" as const : "down" as const,
       color: "text-blue-600",

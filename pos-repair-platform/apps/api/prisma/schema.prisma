@@ -13,7 +13,7 @@ model Category {
   name        String
   description String?
   createdAt   DateTime    @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime    @updatedAt
   Store       Store       @relation(fields: [storeId], references: [id])
   StockItem   StockItem[]
 
@@ -28,7 +28,7 @@ model Customer {
   phone     String?
   notes     String?
   createdAt DateTime @default(now())
-  updatedAt DateTime
+  updatedAt DateTime @updatedAt
   Sale      Sale[]
   Ticket    Ticket[]
 
@@ -48,7 +48,7 @@ model Dispute {
   openedAt                        DateTime          @default(now())
   resolvedAt                      DateTime?
   createdAt                       DateTime          @default(now())
-  updatedAt                       DateTime
+  updatedAt                       DateTime          @updatedAt
   User_Dispute_assignedToIdToUser User?             @relation("Dispute_assignedToIdToUser", fields: [assignedToId], references: [id])
   User_Dispute_raisedByIdToUser   User?             @relation("Dispute_raisedByIdToUser", fields: [raisedById], references: [id])
   Store                           Store             @relation(fields: [storeId], references: [id])
@@ -72,12 +72,16 @@ model DisputeEvidence {
 }
 
 model Employee {
-  id      String    @id
-  name    String
-  pin     String
-  role    StoreRole
-  storeId String
-  Store   Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id         String      @id
+  name       String
+  pin        String
+  role       StoreRole
+  storeId    String
+  Store      Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  Ticket     Ticket[]
+  Refund     Refund[]
+  TimeClock  TimeClock[]
+  TicketNote TicketNote[]
 
   @@unique([storeId, pin])
 }
@@ -88,7 +92,7 @@ model Membership {
   organizationId String
   role           OrganizationRole
   createdAt      DateTime         @default(now())
-  updatedAt      DateTime
+  updatedAt      DateTime         @updatedAt
   Organization   Organization     @relation(fields: [organizationId], references: [id])
   User           User             @relation(fields: [userId], references: [id])
   StoreUserRole  StoreUserRole[]
@@ -101,17 +105,19 @@ model Organization {
   id         String       @id
   name       String
   createdAt  DateTime     @default(now())
-  updatedAt  DateTime
+  updatedAt  DateTime     @updatedAt
   Membership Membership[]
 
   @@index([name])
 }
 
 model Owner {
-  id       String  @id
-  email    String  @unique
-  password String
-  Store    Store[]
+  id        String   @id
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Store     Store[]
 }
 
 model PurchaseOrder {
@@ -128,7 +134,7 @@ model PurchaseOrder {
   tax               Decimal?            @db.Decimal(10, 2)
   total             Decimal?            @db.Decimal(10, 2)
   createdAt         DateTime            @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime            @updatedAt
   Store             Store               @relation(fields: [storeId], references: [id])
   Vendor            Vendor?             @relation(fields: [vendorId], references: [id])
   PurchaseOrderItem PurchaseOrderItem[]
@@ -149,7 +155,7 @@ model PurchaseOrderItem {
   totalCost       Decimal?        @db.Decimal(10, 2)
   metadata        Json?
   createdAt       DateTime        @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime        @updatedAt
   PurchaseOrder   PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id])
   StockItem       StockItem?      @relation(fields: [stockItemId], references: [id])
   StockMovement   StockMovement[]
@@ -167,9 +173,10 @@ model Refund {
   reason       String?
   refundedAt   DateTime @default(now())
   createdAt    DateTime @default(now())
-  updatedAt    DateTime
+  updatedAt    DateTime @updatedAt
   Sale         Sale     @relation(fields: [saleId], references: [id])
   Store        Store    @relation(fields: [storeId], references: [id])
+  Employee     Employee @relation(fields: [refundedById], references: [id])
 
   @@index([refundedById])
   @@index([saleId])
@@ -188,7 +195,7 @@ model Sale {
   total         Decimal?       @db.Decimal(10, 2)
   paidAt        DateTime?
   createdAt     DateTime       @default(now())
-  updatedAt     DateTime
+  updatedAt     DateTime       @updatedAt
   Refund        Refund[]
   Customer      Customer?      @relation(fields: [customerId], references: [id])
   Store         Store          @relation(fields: [storeId], references: [id])
@@ -210,7 +217,7 @@ model SaleLineItem {
   total         Decimal         @db.Decimal(10, 2)
   metadata      Json?
   createdAt     DateTime        @default(now())
-  updatedAt     DateTime
+  updatedAt     DateTime        @updatedAt
   Sale          Sale            @relation(fields: [saleId], references: [id])
   StockItem     StockItem?      @relation(fields: [stockItemId], references: [id])
   StockMovement StockMovement[]
@@ -231,7 +238,7 @@ model StockItem {
   quantityOnHand    Int                 @default(0)
   metadata          Json?
   createdAt         DateTime            @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime            @updatedAt
   categoryId        String?
   PurchaseOrderItem PurchaseOrderItem[]
   SaleLineItem      SaleLineItem[]
@@ -273,7 +280,7 @@ model Store {
   name           String
   timezone       String           @default("America/Chicago")
   createdAt      DateTime         @default(now())
-  updatedAt      DateTime
+  updatedAt      DateTime         @updatedAt
   storeEmail     String           @unique
   ownerId        String
   Category       Category[]
@@ -298,7 +305,7 @@ model StoreUserRole {
   storeId      String
   role         StoreRole
   createdAt    DateTime   @default(now())
-  updatedAt    DateTime
+  updatedAt    DateTime   @updatedAt
   Membership   Membership @relation(fields: [membershipId], references: [id])
   Store        Store      @relation(fields: [storeId], references: [id])
 
@@ -323,13 +330,13 @@ model Ticket {
   completedAt   DateTime?
   cancelledAt   DateTime?
   createdAt     DateTime        @default(now())
-  updatedAt     DateTime
+  updatedAt     DateTime        @updatedAt
   Dispute       Dispute[]
   Sale          Sale[]
   StockMovement StockMovement[]
   Customer      Customer?       @relation(fields: [customerId], references: [id])
   Store         Store           @relation(fields: [storeId], references: [id])
-  User          User?           @relation(fields: [technicianId], references: [id])
+  Employee      Employee?       @relation(fields: [technicianId], references: [id])
   TicketNote    TicketNote[]
   TicketWaiver  TicketWaiver[]
 
@@ -344,9 +351,9 @@ model TicketNote {
   visibility TicketNoteVisibility @default(INTERNAL)
   body       String
   createdAt  DateTime             @default(now())
-  updatedAt  DateTime
-  User       User?                @relation(fields: [authorId], references: [id])
-  Ticket     Ticket               @relation(fields: [ticketId], references: [id])
+  updatedAt  DateTime             @updatedAt
+  Employee   Employee?             @relation(fields: [authorId], references: [id])
+  Ticket     Ticket                @relation(fields: [ticketId], references: [id])
 
   @@index([authorId])
   @@index([ticketId])
@@ -378,12 +385,14 @@ model TimeClock {
   totalHours Decimal?  @db.Decimal(10, 2)
   notes      String?
   createdAt  DateTime  @default(now())
-  updatedAt  DateTime
+  updatedAt  DateTime  @updatedAt
   employeeId String
   Store      Store     @relation(fields: [storeId], references: [id])
+  Employee   Employee  @relation(fields: [employeeId], references: [id])
 
   @@index([clockInAt])
   @@index([storeId])
+  @@index([employeeId])
 }
 
 model User {
@@ -394,12 +403,10 @@ model User {
   lastName                           String?
   phone                              String?
   createdAt                          DateTime     @default(now())
-  updatedAt                          DateTime
+  updatedAt                          DateTime     @updatedAt
   Dispute_Dispute_assignedToIdToUser Dispute[]    @relation("Dispute_assignedToIdToUser")
   Dispute_Dispute_raisedByIdToUser   Dispute[]    @relation("Dispute_raisedByIdToUser")
   Membership                         Membership[]
-  Ticket                             Ticket[]
-  TicketNote                         TicketNote[]
 }
 
 model Vendor {
@@ -411,7 +418,7 @@ model Vendor {
   website       String?
   notes         String?
   createdAt     DateTime        @default(now())
-  updatedAt     DateTime
+  updatedAt     DateTime        @updatedAt
   storeId       String
   PurchaseOrder PurchaseOrder[]
   Store         Store           @relation(fields: [storeId], references: [id])
@@ -423,7 +430,7 @@ model WaiverTemplate {
   content      String
   isActive     Boolean        @default(true)
   createdAt    DateTime       @default(now())
-  updatedAt    DateTime
+  updatedAt    DateTime       @updatedAt
   storeId      String
   TicketWaiver TicketWaiver[]
   Store        Store          @relation(fields: [storeId], references: [id])

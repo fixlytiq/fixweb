@@ -120,7 +120,6 @@ export const mockTickets: Ticket[] = [
   },
   {
     id: "ticket-2",
-    organizationId: "org-1",
     storeId: "store-1",
     customerId: "cust-2",
     title: "Samsung Battery Replacement",
@@ -136,7 +135,6 @@ export const mockTickets: Ticket[] = [
   },
   {
     id: "ticket-3",
-    organizationId: "org-1",
     storeId: "store-1",
     customerId: "cust-3",
     technicianId: "user-2",
@@ -155,7 +153,6 @@ export const mockTickets: Ticket[] = [
   },
   {
     id: "ticket-4",
-    organizationId: "org-1",
     storeId: "store-1",
     customerId: "cust-1",
     title: "MacBook Pro Keyboard Repair",
@@ -187,7 +184,6 @@ export const mockStockItems: StockItem[] = [
   },
   {
     id: "item-2",
-    organizationId: "org-1",
     storeId: "store-1",
     sku: "BAT-SAM-001",
     name: "Samsung Galaxy Battery",
@@ -199,7 +195,6 @@ export const mockStockItems: StockItem[] = [
   },
   {
     id: "item-3",
-    organizationId: "org-1",
     storeId: "store-1",
     sku: "IPAD-CHG-001",
     name: "iPad Charging Port",
@@ -211,7 +206,6 @@ export const mockStockItems: StockItem[] = [
   },
   {
     id: "item-4",
-    organizationId: "org-1",
     storeId: "store-1",
     sku: "MBP-KBD-001",
     name: "MacBook Pro Keyboard",
