@@ -4,6 +4,8 @@ export interface Store {
   id: string;
   name: string;
   storeEmail: string;
+  storePhone?: string;
+  notificationEmail?: string;
   timezone: string;
   createdAt: string;
   updatedAt: string;
@@ -12,11 +14,15 @@ export interface Store {
 export interface CreateStoreDto {
   name: string;
   storeEmail: string;
+  storePhone?: string;
+  notificationEmail?: string;
   timezone?: string;
 }
 
 export interface UpdateStoreDto {
   name?: string;
+  storePhone?: string;
+  notificationEmail?: string;
   timezone?: string;
 }
 

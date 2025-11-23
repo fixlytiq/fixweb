@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { UserPlus, Mail, Lock, User, Store, AlertCircle } from "lucide-react";
+import { UserPlus, Mail, Lock, User, Store, AlertCircle, Phone } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -15,18 +15,57 @@ export default function RegisterPage() {
     ownerName: "",
     storeName: "",
     storeEmail: "",
+    storePhone: "",
+    notificationEmail: "",
     pin: "",
   });
   const [confirmPin, setConfirmPin] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  const validatePhoneNumber = (phone: string): boolean => {
+    if (!phone) return true; // Optional field
+    // E.164 format: + followed by 1-15 digits
+    const phoneRegex = /^\+[1-9]\d{1,14}$/;
+    return phoneRegex.test(phone);
+  };
+
+  const formatPhoneNumber = (value: string): string => {
+    // Remove all non-digit characters except +
+    let cleaned = value.replace(/[^\d+]/g, '');
+    
+    // If it doesn't start with +, add it
+    if (cleaned && !cleaned.startsWith('+')) {
+      cleaned = '+' + cleaned;
+    }
+    
+    return cleaned;
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    
+    if (name === 'storePhone') {
+      const formatted = formatPhoneNumber(value);
+      setFormData((prev) => ({
+        ...prev,
+        [name]: formatted,
+      }));
+      
+      // Validate phone number
+      if (formatted && !validatePhoneNumber(formatted)) {
+        setPhoneError('Phone number must be in E.164 format (e.g., +1234567890)');
+      } else {
+        setPhoneError(null);
+      }
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+    
     setError(null);
   };
 
@@ -48,11 +87,20 @@ export default function RegisterPage() {
       return;
     }
 
+    // Validate phone number if provided
+    if (formData.storePhone && !validatePhoneNumber(formData.storePhone)) {
+      setError("Phone number must be in E.164 format (e.g., +1234567890)");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       await register({
         ownerName: formData.ownerName,
         storeName: formData.storeName,
         storeEmail: formData.storeEmail,
+        storePhone: formData.storePhone || undefined,
+        notificationEmail: formData.notificationEmail || undefined,
         pin: formData.pin,
       });
       // Navigation will happen automatically in the auth context
@@ -169,6 +217,63 @@ export default function RegisterPage() {
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 This will be used to log in to your store
+              </p>
+            </div>
+
+            {/* Store Phone */}
+            <div>
+              <label htmlFor="storePhone" className="block text-sm font-medium text-foreground">
+                Store Phone Number <span className="text-muted-foreground">(Optional)</span>
+              </label>
+              <div className="relative mt-1">
+                <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  id="storePhone"
+                  name="storePhone"
+                  type="tel"
+                  autoComplete="tel"
+                  value={formData.storePhone}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                  className={cn(
+                    "h-10 w-full rounded-lg border bg-background pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed",
+                    phoneError 
+                      ? "border-red-500 focus:ring-red-500" 
+                      : "border-border"
+                  )}
+                  placeholder="+1234567890"
+                />
+              </div>
+              {phoneError ? (
+                <p className="mt-1 text-xs text-red-500">{phoneError}</p>
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Used to send SMS notifications to customers (E.164 format: +1234567890)
+                </p>
+              )}
+            </div>
+
+            {/* Notification Email */}
+            <div>
+              <label htmlFor="notificationEmail" className="block text-sm font-medium text-foreground">
+                Notification Email <span className="text-muted-foreground">(Optional)</span>
+              </label>
+              <div className="relative mt-1">
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  id="notificationEmail"
+                  name="notificationEmail"
+                  type="email"
+                  autoComplete="email"
+                  value={formData.notificationEmail}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                  className="h-10 w-full rounded-lg border border-border bg-background pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder="notifications@example.com"
+                />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Used as sender email for customer notifications (defaults to store email)
               </p>
             </div>
 

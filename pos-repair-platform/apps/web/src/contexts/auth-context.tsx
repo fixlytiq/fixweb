@@ -24,6 +24,8 @@ export interface RegisterData {
   ownerName: string;
   storeName: string;
   storeEmail: string;
+  storePhone?: string;
+  notificationEmail?: string;
   pin: string;
 }
 

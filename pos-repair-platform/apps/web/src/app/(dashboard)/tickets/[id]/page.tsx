@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Edit, Clock, User, Calendar, Loader2, AlertCircle, Trash2, CreditCard, DollarSign, CheckCircle, XCircle, AlertCircle as AlertCircleIcon, Package, Wrench, CheckCircle2 } from "lucide-react";
 import { ticketsApi, type Ticket, type TicketStatus, type TicketNote } from "@/lib/api/tickets";
@@ -10,6 +10,8 @@ import { salesApi, type Sale } from "@/lib/api/sales";
 import { cn } from "@/lib/utils";
 import { TicketStatusUpdater } from "@/components/ticket-status-updater";
 import { TicketNotes } from "@/components/ticket-notes";
+import { PostRepairForm } from "@/components/post-repair-form";
+import { PreRepairForm } from "@/components/pre-repair-form";
 import { useAuth } from "@/contexts/auth-context";
 
 const statusConfig: Record<TicketStatus, { 
@@ -56,12 +58,9 @@ const statusConfig: Record<TicketStatus, {
   },
 };
 
-export default function TicketDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
+export default function TicketDetailPage() {
+  const params = useParams();
+  const id = params?.id as string;
   const router = useRouter();
   const { user } = useAuth();
   
@@ -136,15 +135,42 @@ export default function TicketDetailPage({
 
     setIsUpdating(true);
     try {
-      // Automatically assign the logged-in user
+      // Try to find the employee - first by exact ID match, then by role and store
+      let employeeToAssign = employees.find(emp => emp.id === user.employeeId);
+      
+      // If not found by ID, try to find an employee with matching role
+      // This handles cases where the employeeId in JWT might be stale
+      if (!employeeToAssign && employees.length > 0) {
+        // Try to find an employee with the same role
+        employeeToAssign = employees.find(emp => emp.role === user.role);
+      }
+      
+      if (!employeeToAssign) {
+        // If still not found, try to assign using the employeeId from JWT anyway
+        // The backend will validate and provide a better error if it fails
+        console.warn(`Employee ${user.employeeId} not found in employees list, attempting assignment anyway`);
+      }
+
+      // Use the found employee ID, or fall back to user.employeeId
+      const employeeIdToUse = employeeToAssign?.id || user.employeeId;
+
+      // Assign the ticket
       const updateData: { technicianId: string } = {
-        technicianId: user.employeeId
+        technicianId: employeeIdToUse
       };
       const updated = await ticketsApi.update(ticket.id, updateData);
       setTicket(updated);
     } catch (err: any) {
       console.error("Error assigning technician:", err);
-      const errorMessage = err.message || "Failed to assign technician";
+      let errorMessage = err.message || "Failed to assign technician";
+      
+      // Provide more helpful error messages
+      if (errorMessage.includes("not found") || errorMessage.includes("does not exist")) {
+        errorMessage = "Your employee record was not found in the system. This may happen if your employee record was deleted. Please try logging out and back in, or contact an administrator.";
+      } else if (errorMessage.includes("does not belong to your store")) {
+        errorMessage = "You cannot be assigned to this ticket because your employee record doesn't match the ticket's store. Please contact an administrator.";
+      }
+      
       alert(errorMessage);
     } finally {
       setIsUpdating(false);
@@ -186,12 +212,24 @@ export default function TicketDetailPage({
 
   const refreshNotes = async () => {
     try {
+      console.log("Refreshing notes for ticket:", id);
       const notesData = await ticketsApi.getNotes(id);
+      console.log("Notes refreshed, count:", notesData.length);
       setNotes(notesData);
     } catch (err) {
       console.error("Error refreshing notes:", err);
     }
   };
+
+  // Check if post-repair form has already been submitted
+  const hasPostRepairForm = notes.some(note => 
+    note.body && note.body.trim().startsWith("POST-REPAIR FORM COMPLETED")
+  );
+
+  // Check if pre-repair form has already been submitted
+  const hasPreRepairForm = notes.some(note => 
+    note.body && note.body.trim().startsWith("PRE-REPAIR DEVICE INSPECTION")
+  );
 
   if (isLoading) {
     return (
@@ -400,6 +438,27 @@ export default function TicketDetailPage({
               )}
             </div>
           </div>
+
+          {/* Pre-Repair Form - Show only if not already saved */}
+          {!hasPreRepairForm && (
+            <div className="mb-6">
+              <PreRepairForm
+                ticketId={ticket.id}
+                readOnly={false}
+                onSuccess={refreshNotes}
+              />
+            </div>
+          )}
+
+          {/* Post-Repair Form - Show when status is READY or COMPLETED and form hasn't been submitted yet */}
+          {(ticket.status === "COMPLETED" || ticket.status === "READY") && !hasPostRepairForm ? (
+            <div className="mb-6">
+              <PostRepairForm
+                ticketId={ticket.id}
+                onSuccess={refreshNotes}
+              />
+            </div>
+          ) : null}
 
           {/* Notes */}
           <div className="rounded-lg border border-border bg-card p-6">

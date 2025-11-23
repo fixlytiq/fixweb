@@ -32,6 +32,8 @@ export class StoresService {
         id: crypto.randomUUID(),
         name: createStoreDto.name.trim(),
         storeEmail: createStoreDto.storeEmail,
+        storePhone: createStoreDto.storePhone || null,
+        notificationEmail: createStoreDto.notificationEmail || createStoreDto.storeEmail,
         timezone: createStoreDto.timezone || 'America/Chicago',
         ownerId: owner.id,
         updatedAt: new Date(),
@@ -80,6 +82,14 @@ export class StoresService {
 
     if (updateStoreDto.name !== undefined) {
       updateData.name = updateStoreDto.name.trim();
+    }
+
+    if (updateStoreDto.storePhone !== undefined) {
+      updateData.storePhone = updateStoreDto.storePhone || null;
+    }
+
+    if (updateStoreDto.notificationEmail !== undefined) {
+      updateData.notificationEmail = updateStoreDto.notificationEmail || null;
     }
 
     if (updateStoreDto.timezone !== undefined) {

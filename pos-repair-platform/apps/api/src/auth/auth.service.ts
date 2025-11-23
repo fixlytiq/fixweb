@@ -50,6 +50,8 @@ export class AuthService {
           id: crypto.randomUUID(),
           name: storeName,
           storeEmail: storeEmail,
+          storePhone: dto.storePhone || null,
+          notificationEmail: dto.notificationEmail || storeEmail,
           ownerId: owner.id,
           updatedAt: new Date(),
         },

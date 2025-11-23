@@ -14,4 +14,6 @@ export { VendorForm, type VendorFormData } from "./vendor-form";
 // StoreSwitcher removed - users can only access their own store
 export { AuditTrailTable, type AuditTrailEntry } from "./audit-trail-table";
 export { TicketStatusUpdater } from "./ticket-status-updater";
+export { PostRepairForm } from "./post-repair-form";
+export { PreRepairForm } from "./pre-repair-form";
 

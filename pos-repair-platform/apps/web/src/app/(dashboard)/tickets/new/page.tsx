@@ -142,8 +142,27 @@ export default function NewTicketPage() {
       // Create the ticket
       const ticket = await ticketsApi.create(createTicketDto);
       
-      // TODO: Save inspection data and waiver to ticket (when backend supports it)
-      // For now, we'll just create the ticket with basic info
+      // Auto-save pre-repair inspection data if any component has been inspected (not all NA)
+      const hasInspectionData = inspectionData.some(item => item.preRepair !== "NA");
+      if (hasInspectionData) {
+        try {
+          const inspectionLines = inspectionData.map(item => 
+            `${item.label}: ${item.preRepair}`
+          ).join('\n');
+
+          const noteContent = `PRE-REPAIR DEVICE INSPECTION
+
+${inspectionLines}`;
+
+          await ticketsApi.addNote(ticket.id, {
+            body: noteContent,
+            visibility: "INTERNAL",
+          });
+        } catch (noteError) {
+          // Don't block ticket creation if note saving fails
+          console.warn("Failed to save pre-repair inspection note:", noteError);
+        }
+      }
       
       // Redirect to the ticket detail page
       router.push(`/tickets/${ticket.id}`);

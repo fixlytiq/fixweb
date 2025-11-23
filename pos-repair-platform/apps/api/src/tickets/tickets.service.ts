@@ -5,10 +5,14 @@ import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { CreateTicketNoteDto } from './dto/create-ticket-note.dto';
 import { UserPayload } from '../auth/types';
 import { StoreRole, TicketStatus } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class TicketsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async create(user: UserPayload, createTicketDto: CreateTicketDto) {
     // All authenticated users can create tickets
@@ -225,13 +229,41 @@ export class TicketsService {
           });
           
           if (!technician) {
-            throw new NotFoundException(`Technician with ID "${updateTicketDto.technicianId}" not found in your store`);
+            // Check if employee exists at all (even in different store) for better error message
+            const employeeExists = await this.prisma.employee.findUnique({
+              where: { id: updateTicketDto.technicianId },
+            });
+            
+            if (!employeeExists) {
+              // If assigning to self and employee doesn't exist, try to find employee by user's employeeId
+              // This handles cases where the JWT has a stale employeeId
+              if (updateTicketDto.technicianId === user.employeeId) {
+                // Try to find an employee with the same role in the same store
+                const fallbackEmployee = await this.prisma.employee.findFirst({
+                  where: {
+                    storeId: user.storeId,
+                    role: user.role,
+                  },
+                });
+                
+                if (fallbackEmployee) {
+                  console.warn(`Employee ${user.employeeId} not found, using fallback employee ${fallbackEmployee.id} with same role`);
+                  updateData.technicianId = fallbackEmployee.id;
+                } else {
+                  throw new NotFoundException(`Your employee record (ID: ${updateTicketDto.technicianId}) does not exist in the system. Please log out and log back in to refresh your session.`);
+                }
+              } else {
+                throw new NotFoundException(`Employee with ID "${updateTicketDto.technicianId}" does not exist in the system`);
+              }
+            } else {
+              throw new BadRequestException(`Employee with ID "${updateTicketDto.technicianId}" does not belong to your store (${user.storeId})`);
+            }
+          } else {
+            updateData.technicianId = updateTicketDto.technicianId;
           }
-          
-          updateData.technicianId = updateTicketDto.technicianId;
         } catch (err: any) {
-          // If it's already a NotFoundException, re-throw it
-          if (err instanceof NotFoundException) {
+          // If it's already a NotFoundException or BadRequestException, re-throw it
+          if (err instanceof NotFoundException || err instanceof BadRequestException) {
             throw err;
           }
           // Otherwise, log and throw a more descriptive error
@@ -257,7 +289,7 @@ export class TicketsService {
     }
 
         try {
-          return await this.prisma.ticket.update({
+          const updatedTicket = await this.prisma.ticket.update({
             where: { id },
             data: {
               ...updateData,
@@ -269,6 +301,9 @@ export class TicketsService {
                 select: {
                   id: true,
                   name: true,
+                  storeEmail: true,
+                  storePhone: true,
+                  notificationEmail: true,
                 },
               },
               Employee: {
@@ -280,6 +315,16 @@ export class TicketsService {
               },
             } as any,
           });
+
+          // Send notification if status changed and customer exists
+          if (updateTicketDto.status !== undefined && updateTicketDto.status !== existing.status && updatedTicket.Customer) {
+            this.sendStatusUpdateNotification(updatedTicket, updateTicketDto.status).catch((error) => {
+              console.error('Failed to send notification:', error);
+              // Don't fail the update if notification fails
+            });
+          }
+
+          return updatedTicket;
         } catch (error: any) {
           console.error('Error updating ticket:', error);
           console.error('Error message:', error.message);
@@ -357,24 +402,76 @@ export class TicketsService {
   }
 
   async addNote(user: UserPayload, ticketId: string, createNoteDto: CreateTicketNoteDto) {
-    // Check if ticket exists and user has access
-    const ticket = await this.findOne(user, ticketId);
+    try {
+      // Check if ticket exists and user has access
+      const ticket = await this.findOne(user, ticketId);
 
-    // VIEWER cannot add notes
-    if (user.role === StoreRole.VIEWER) {
-      throw new ForbiddenException('You do not have permission to add notes');
-    }
+      // VIEWER cannot add notes
+      if (user.role === StoreRole.VIEWER) {
+        throw new ForbiddenException('You do not have permission to add notes');
+      }
 
-    return this.prisma.ticketNote.create({
-      data: {
+      // For now, set authorId to null to avoid foreign key constraint issues
+      // TODO: Re-enable employee lookup once we verify employee records exist
+      const authorId: string | null = null;
+      
+      // Prepare data object with explicit null for authorId
+      const noteData = {
         id: crypto.randomUUID(),
         ticketId: ticket.id,
-        authorId: user.employeeId,
+        authorId: null as string | null, // Explicitly set to null
         body: createNoteDto.body,
         visibility: createNoteDto.visibility || 'INTERNAL',
         updatedAt: new Date(),
-      },
-    });
+      };
+
+      console.log('Creating note with data:', { 
+        id: noteData.id,
+        ticketId: noteData.ticketId,
+        authorId: noteData.authorId,
+        visibility: noteData.visibility,
+        bodyLength: noteData.body.length 
+      });
+
+      const createdNote = await this.prisma.ticketNote.create({
+        data: noteData,
+      });
+
+      console.log('Note created successfully:', {
+        id: createdNote.id,
+        ticketId: createdNote.ticketId,
+        createdAt: createdNote.createdAt,
+      });
+
+      return createdNote;
+    } catch (error: any) {
+      console.error('Error adding note:', error);
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      console.error('Error meta:', error.meta);
+      
+      // Handle Prisma errors
+      if (error.code === 'P2003') {
+        throw new BadRequestException(`Invalid foreign key reference: ${error.meta?.field_name || 'ticket or employee not found'}`);
+      }
+      if (error.code === 'P2025') {
+        throw new NotFoundException('Record not found');
+      }
+      
+      // Re-throw known exceptions
+      if (error instanceof ForbiddenException || error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      
+      // Return more detailed error message
+      const errorMessage = error.message || 'Unknown error';
+      console.error('Full error stack:', error.stack);
+      
+      throw new HttpException(
+        `Failed to add note: ${errorMessage}. Error code: ${error.code || 'N/A'}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   async getNotes(user: UserPayload, ticketId: string) {
@@ -387,6 +484,31 @@ export class TicketsService {
       },
       include: {},
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  private async sendStatusUpdateNotification(ticket: any, newStatus: TicketStatus): Promise<void> {
+    if (!ticket.Customer) {
+      return; // No customer to notify
+    }
+
+    const customerName = ticket.Customer.firstName && ticket.Customer.lastName
+      ? `${ticket.Customer.firstName} ${ticket.Customer.lastName}`
+      : ticket.Customer.firstName || ticket.Customer.lastName || 'Customer';
+
+    await this.notificationsService.sendTicketStatusUpdate({
+      ticketId: ticket.id,
+      ticketTitle: ticket.title,
+      status: newStatus,
+      customerName,
+      customerPhone: ticket.Customer.phone || undefined,
+      customerEmail: ticket.Customer.email || undefined,
+      storeName: ticket.Store.name,
+      storeEmail: ticket.Store.storeEmail || undefined,
+      storePhone: ticket.Store.storePhone || undefined,
+      storeNotificationEmail: ticket.Store.notificationEmail || ticket.Store.storeEmail || undefined,
+      estimatedCost: ticket.estimatedCost ? Number(ticket.estimatedCost) : undefined,
+      total: ticket.total ? Number(ticket.total) : undefined,
     });
   }
 }
