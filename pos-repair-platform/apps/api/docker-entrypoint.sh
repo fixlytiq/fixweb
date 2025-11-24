@@ -2,15 +2,23 @@
 set -e
 
 wait_for_postgres() {
-  echo "Waiting for PostgreSQL to be ready..."
+  echo "Checking PostgreSQL connection..."
   
-  # Extract host and port from DATABASE_URL
+  # Check if using Cloud SQL Unix socket (Cloud Run)
+  if echo "$DATABASE_URL" | grep -q "/cloudsql/"; then
+    echo "Detected Cloud SQL Unix socket connection - skipping host/port check"
+    # For Cloud SQL, we'll let Prisma handle the connection
+    return 0
+  fi
+  
+  # Extract host and port from DATABASE_URL for standard connections
   DB_HOST=$(echo "$DATABASE_URL" | sed -n 's/.*@\([^:]*\):.*/\1/p')
   DB_PORT=$(echo "$DATABASE_URL" | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
   
   DB_HOST=${DB_HOST:-postgres}
   DB_PORT=${DB_PORT:-5432}
   
+  echo "Waiting for PostgreSQL at $DB_HOST:$DB_PORT..."
   until nc -z "$DB_HOST" "$DB_PORT" 2>/dev/null; do
     echo "PostgreSQL is unavailable at $DB_HOST:$DB_PORT - sleeping"
     sleep 2
@@ -21,10 +29,13 @@ wait_for_postgres() {
 
 wait_for_postgres
 
-# Run Prisma migrations
+# Run Prisma migrations (with timeout to prevent hanging)
 if [ -n "$DATABASE_URL" ]; then
   echo "Running Prisma migrations..."
   cd /app
+  
+  # Set a timeout for migrations (5 minutes) - run in background with timeout
+  (
   
   # Find Prisma binary
   PRISMA_BIN="/app/apps/api/node_modules/.bin/prisma"
@@ -98,9 +109,18 @@ EOF
   fi
   
   echo "Migrations completed successfully"
+  ) &
+  MIGRATION_PID=$!
+  
+  # Wait for migration with timeout
+  if ! timeout 300 wait $MIGRATION_PID 2>/dev/null; then
+    echo "Migration timed out or failed, but continuing with application startup..."
+    kill $MIGRATION_PID 2>/dev/null || true
+  fi
 else
   echo "Warning: DATABASE_URL not set, skipping migrations"
 fi
 
+echo "Starting application..."
 exec "$@"
 

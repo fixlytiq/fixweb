@@ -2,6 +2,14 @@
 
 # GCP Setup Script for POS Repair Platform
 # This script helps set up GCP resources for deployment
+# 
+# Usage:
+#   export GCP_PROJECT_ID="your-project-id"
+#   export GCP_REGION="us-central1"
+#   ./scripts/setup-gcp.sh
+#
+# Or run interactively:
+#   ./scripts/setup-gcp.sh
 
 set -e
 

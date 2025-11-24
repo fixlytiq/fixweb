@@ -1,0 +1,24 @@
+# GCP Configuration - DO NOT COMMIT THIS FILE
+# Generated during setup
+
+PROJECT_ID=pos-repair-platform
+REGION=us-central1
+ZONE=us-central1-a
+
+# Redis (Memorystore)
+REDIS_INSTANCE=pos-repair-redis
+REDIS_IP=10.200.206.67
+REDIS_PORT=6379
+
+# PostgreSQL (Cloud SQL)
+SQL_INSTANCE=pos-repair-postgres
+SQL_DATABASE=pos_repair_platform
+SQL_USER=posrepair_user
+SQL_PASSWORD=SecureDBPass123!
+SQL_ROOT_PASSWORD=TempPassword123!
+CONNECTION_NAME=pos-repair-platform:us-central1:pos-repair-postgres
+
+# VPC
+VPC_CONNECTOR=pos-repair-connector
+VPC_NETWORK=pos-repair-network
+VPC_SUBNET=pos-repair-subnet

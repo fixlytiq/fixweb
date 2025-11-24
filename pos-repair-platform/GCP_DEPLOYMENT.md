@@ -2,6 +2,8 @@
 
 This guide covers deploying the POS Repair Platform to Google Cloud Platform (GCP) with Memorystore for Redis, Cloud SQL for PostgreSQL, and deployment to Cloud Run or GKE.
 
+**For a detailed step-by-step setup guide, see [GCP_SETUP_STEP_BY_STEP.md](./GCP_SETUP_STEP_BY_STEP.md)**
+
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)

@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json ./
 COPY package-lock.json* ./
 COPY apps/web/package.json ./apps/web/
-COPY apps/web/package-lock.json* ./apps/web/
+# Note: package-lock.json for web app is optional in workspace setup
 
 # Install dependencies
 RUN npm ci
