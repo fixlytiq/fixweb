@@ -86,7 +86,7 @@ export default function LoginPage() {
                   autoComplete="email"
                   required
                   value={storeEmail}
-                  onChange={(e) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     setStoreEmail(e.target.value);
                     setError(null);
                   }}
@@ -112,7 +112,7 @@ export default function LoginPage() {
                   minLength={4}
                   maxLength={8}
                   value={pin}
-                  onChange={(e) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     setPin(e.target.value);
                     setError(null);
                   }}
