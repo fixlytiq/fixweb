@@ -135,12 +135,12 @@ export default function TicketDetailPage() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>{ticket.title}</CardTitle>
-            <CardDescription>
+            <div className="flex items-center justify-between">
+              <CardTitle>{ticket.title}</CardTitle>
               <Badge className={statusColors[ticket.status] || ''}>
                 {ticket.status}
               </Badge>
-            </CardDescription>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {ticket.description && (
