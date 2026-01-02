@@ -15,11 +15,24 @@ async function bootstrap() {
   );
   
   // Enable CORS for frontend
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  let allowedOrigins: string[] | boolean;
+  
+  if (isDevelopment) {
+    // In development, allow all origins for easier local development
+    allowedOrigins = true;
+  } else {
+    // In production, use configured origins
+    allowedOrigins = process.env.FRONTEND_URL 
+      ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+      : ['http://localhost:3001', 'http://localhost:3002'];
+  }
+  
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Store-Id'],
   });
   
   app.enableShutdownHooks();

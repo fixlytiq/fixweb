@@ -503,6 +503,7 @@ export class TicketsService {
       customerName,
       customerPhone: ticket.Customer.phone || undefined,
       customerEmail: ticket.Customer.email || undefined,
+      storeId: ticket.storeId,
       storeName: ticket.Store.name,
       storeEmail: ticket.Store.storeEmail || undefined,
       storePhone: ticket.Store.storePhone || undefined,

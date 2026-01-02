@@ -201,6 +201,7 @@ model Sale {
   Store         Store          @relation(fields: [storeId], references: [id])
   Ticket        Ticket?        @relation(fields: [ticketId], references: [id])
   SaleLineItem  SaleLineItem[]
+  NotificationHistory NotificationHistory[]
 
   @@index([customerId])
   @@index([storeId])
@@ -291,6 +292,7 @@ model Store {
   PurchaseOrder  PurchaseOrder[]
   Refund         Refund[]
   Sale           Sale[]
+  NotificationHistory NotificationHistory[]
   StockItem      StockItem[]
   StockMovement  StockMovement[]
   Owner          Owner            @relation(fields: [ownerId], references: [id])
@@ -341,6 +343,7 @@ model Ticket {
   Employee      Employee?       @relation(fields: [technicianId], references: [id])
   TicketNote    TicketNote[]
   TicketWaiver  TicketWaiver[]
+  NotificationHistory NotificationHistory[]
 
   @@index([status])
   @@index([storeId])
@@ -395,6 +398,32 @@ model TimeClock {
   @@index([clockInAt])
   @@index([storeId])
   @@index([employeeId])
+}
+
+model NotificationHistory {
+  id          String                @id @default(uuid())
+  storeId     String
+  type        NotificationType
+  channel     NotificationChannel
+  title       String
+  message     String
+  recipient   String?               // Phone number or email address
+  ticketId    String?
+  saleId      String?
+  read        Boolean               @default(false)
+  readAt      DateTime?
+  sentAt      DateTime              @default(now())
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  Store       Store                 @relation(fields: [storeId], references: [id])
+  Ticket      Ticket?               @relation(fields: [ticketId], references: [id])
+  Sale        Sale?                 @relation(fields: [saleId], references: [id])
+
+  @@index([storeId])
+  @@index([ticketId])
+  @@index([saleId])
+  @@index([read])
+  @@index([sentAt])
 }
 
 model User {
@@ -505,4 +534,22 @@ enum TicketStatus {
   READY
   COMPLETED
   CANCELLED
+}
+
+enum NotificationType {
+  TICKET_STATUS_UPDATE
+  TICKET_CREATED
+  TICKET_COMPLETED
+  LOW_STOCK_ALERT
+  SALE_COMPLETED
+  REFUND_PROCESSED
+  SYSTEM_ALERT
+  OTHER
+}
+
+enum NotificationChannel {
+  SMS
+  EMAIL
+  PUSH
+  IN_APP
 }

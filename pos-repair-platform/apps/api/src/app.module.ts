@@ -13,6 +13,9 @@ import { InventoryModule } from './inventory/inventory.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { SalesModule } from './sales/sales.module';
 import { CategoriesModule } from './categories/categories.module';
+import { ReportsModule } from './reports/reports.module';
+import { CustomersModule } from './customers/customers.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -30,6 +33,9 @@ import { CategoriesModule } from './categories/categories.module';
     TicketsModule,
     SalesModule,
     CategoriesModule,
+    ReportsModule,
+    CustomersModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

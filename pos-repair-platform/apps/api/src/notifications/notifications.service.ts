@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import twilio from 'twilio';
 import * as nodemailer from 'nodemailer';
-import { TicketStatus } from '@prisma/client';
+import { TicketStatus, NotificationType, NotificationChannel } from '@prisma/client';
+import { NotificationHistoryService } from './notification-history.service';
 
 export interface TicketNotificationData {
   ticketId: string;
@@ -11,6 +12,7 @@ export interface TicketNotificationData {
   customerName?: string;
   customerPhone?: string;
   customerEmail?: string;
+  storeId: string;
   storeName: string;
   storeEmail?: string;
   storePhone?: string;
@@ -26,7 +28,10 @@ export class NotificationsService {
   private twilioClient: twilio.Twilio | null = null;
   private emailTransporter: nodemailer.Transporter | null = null;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private notificationHistoryService: NotificationHistoryService,
+  ) {
     this.initializeTwilio();
     this.initializeEmail();
   }
@@ -92,27 +97,52 @@ export class NotificationsService {
   }
 
   async sendTicketStatusUpdate(data: TicketNotificationData): Promise<void> {
-    const promises: Promise<void>[] = [];
+    const promises: Array<{ promise: Promise<void>; channel: NotificationChannel; recipient?: string }> = [];
+    const storeId = data.storeId;
 
     // Send SMS if phone number is available
     if (data.customerPhone && this.twilioClient) {
-      promises.push(this.sendSMS(data));
+      promises.push({
+        promise: this.sendSMS(data),
+        channel: NotificationChannel.SMS,
+        recipient: data.customerPhone,
+      });
     }
 
     // Send email if email is available
     if (data.customerEmail && this.emailTransporter) {
-      promises.push(this.sendEmail(data));
+      promises.push({
+        promise: this.sendEmail(data),
+        channel: NotificationChannel.EMAIL,
+        recipient: data.customerEmail,
+      });
     }
 
     // Execute all notifications in parallel
-    await Promise.allSettled(promises).then((results) => {
-      results.forEach((result, index) => {
-        if (result.status === 'rejected') {
-          const type = index === 0 && data.customerPhone ? 'SMS' : 'Email';
-          this.logger.error(`Failed to send ${type} notification:`, result.reason);
+    const results = await Promise.allSettled(promises.map(p => p.promise));
+
+    // Store notification history for successful sends
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === 'fulfilled') {
+        const { channel, recipient } = promises[i];
+        try {
+          await this.notificationHistoryService.create(storeId, {
+            type: NotificationType.TICKET_STATUS_UPDATE,
+            channel,
+            title: `Repair Ticket Update - ${data.ticketTitle}`,
+            message: this.getStatusMessage(data.status),
+            recipient,
+            ticketId: data.ticketId,
+          });
+        } catch (error) {
+          this.logger.error('Failed to store notification history:', error);
         }
-      });
-    });
+      } else if (result.status === 'rejected') {
+        const type = promises[i].channel;
+        this.logger.error(`Failed to send ${type} notification:`, result.reason);
+      }
+    }
   }
 
   private async sendSMS(data: TicketNotificationData): Promise<void> {
