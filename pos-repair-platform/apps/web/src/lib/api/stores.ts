@@ -7,6 +7,7 @@ export interface Store {
   storePhone?: string;
   notificationEmail?: string;
   timezone: string;
+  taxRate?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -24,6 +25,7 @@ export interface UpdateStoreDto {
   storePhone?: string;
   notificationEmail?: string;
   timezone?: string;
+  taxRate?: number;
 }
 
 export const storesApi = {

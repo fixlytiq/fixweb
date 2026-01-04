@@ -223,6 +223,12 @@ export default function SettingsPage() {
                     <label className="block text-sm font-medium text-foreground">Timezone</label>
                     <p className="mt-1 text-sm text-muted-foreground">{store.timezone}</p>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground">Tax Rate</label>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {store.taxRate ? `${(store.taxRate * 100).toFixed(2)}%` : "8.00% (default)"}
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No store information available</p>
@@ -346,10 +352,15 @@ interface StoreModalProps {
 function StoreModal({ store, onSave, onClose }: StoreModalProps) {
   const [name, setName] = useState(store?.name || "");
   const [timezone, setTimezone] = useState(store?.timezone || "America/Chicago");
+  const [taxRate, setTaxRate] = useState(store?.taxRate ? (store.taxRate * 100).toString() : "8");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({ name, timezone });
+    onSave({ 
+      name, 
+      timezone,
+      taxRate: parseFloat(taxRate) / 100 
+    });
   };
 
   return (
@@ -393,6 +404,25 @@ function StoreModal({ store, onSave, onClose }: StoreModalProps) {
               <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
               <option value="America/Denver">America/Denver (MST)</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              Tax Rate (%)
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={taxRate}
+              onChange={(e) => setTaxRate(e.target.value)}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="8.00"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Enter tax rate as percentage (e.g., 8 for 8%)
+            </p>
           </div>
 
           <div className="flex gap-3 pt-4">

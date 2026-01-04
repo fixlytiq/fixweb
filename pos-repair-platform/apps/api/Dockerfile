@@ -14,13 +14,16 @@ RUN npm ci
 # Copy Prisma schema
 COPY apps/api/prisma ./apps/api/prisma
 
-# Generate Prisma Client
+# Copy source code
+COPY apps/api ./apps/api
+
+# Copy entrypoint script to builder
+COPY apps/api/docker-entrypoint.sh ./docker-entrypoint.sh
+
+# Generate Prisma Client (after copying source to ensure proper paths)
 WORKDIR /app/apps/api
 RUN npx prisma generate --schema=prisma/schema.prisma
 WORKDIR /app
-
-# Copy source code
-COPY apps/api ./apps/api
 
 # Build the application
 RUN npm run build:api
@@ -30,7 +33,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 # Install runtime dependencies
-RUN apk add --no-cache bash netcat-openbsd wget
+RUN apk add --no-cache bash netcat-openbsd wget postgresql-client
 
 # Create package.json without "type": "module" to avoid ES module conflicts
 RUN echo '{"name": "pos-repair-platform", "private": true}' > package.json
@@ -47,8 +50,9 @@ COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
 COPY --from=builder /app/apps/api/dist ./dist
 
 # Copy entrypoint script
-COPY apps/api/docker-entrypoint.sh ./docker-entrypoint.sh
-RUN chmod +x ./docker-entrypoint.sh
+COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh && \
+    sed -i 's/\r$//' ./docker-entrypoint.sh || true
 
 # Set NODE_PATH to include both node_modules locations
 ENV NODE_PATH=/app/node_modules:/app/apps/api/node_modules

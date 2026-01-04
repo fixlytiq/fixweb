@@ -12,6 +12,11 @@ import {
   LogOut,
   Menu,
   X,
+  BarChart3,
+  Users,
+  Building2,
+  ShoppingCart,
+  AlertTriangle,
 } from "lucide-react";
 import { useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -22,6 +27,11 @@ const navigation = [
   { name: "Tickets", href: "/tickets", icon: Ticket },
   { name: "Inventory", href: "/inventory", icon: Package },
   { name: "POS", href: "/pos", icon: CreditCard },
+  { name: "Customers", href: "/customers", icon: Users },
+  { name: "Vendors", href: "/vendors", icon: Building2 },
+  { name: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart },
+  { name: "Disputes", href: "/disputes", icon: AlertTriangle },
+  { name: "Reports", href: "/reports", icon: BarChart3 },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

@@ -96,6 +96,10 @@ export class StoresService {
       updateData.timezone = updateStoreDto.timezone;
     }
 
+    if (updateStoreDto.taxRate !== undefined) {
+      updateData.taxRate = updateStoreDto.taxRate;
+    }
+
     return this.prisma.store.update({
       where: { id },
       data: {

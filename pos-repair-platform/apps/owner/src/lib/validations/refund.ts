@@ -12,12 +12,7 @@ export const refundSchema = z.object({
     }
   ),
   reason: z.string().optional(),
-}).refine(
-  (data, ctx) => {
-    // This will be validated against selectedSale.total in the component
-    return true;
-  }
-);
+});
 
 export type RefundFormData = z.infer<typeof refundSchema>;
 

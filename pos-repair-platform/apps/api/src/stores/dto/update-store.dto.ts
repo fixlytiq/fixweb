@@ -1,4 +1,5 @@
-import { IsString, IsOptional, MinLength, IsEmail, Matches } from 'class-validator';
+import { IsString, IsOptional, MinLength, IsEmail, Matches, IsNumber, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateStoreDto {
   @IsOptional()
@@ -20,5 +21,12 @@ export class UpdateStoreDto {
   @IsOptional()
   @IsString()
   timezone?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(1)
+  taxRate?: number;
 }
 

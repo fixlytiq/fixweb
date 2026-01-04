@@ -15,6 +15,9 @@ import { SalesModule } from './sales/sales.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ReportsModule } from './reports/reports.module';
 import { CustomersModule } from './customers/customers.module';
+import { VendorsModule } from './vendors/vendors.module';
+import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
+import { DisputesModule } from './disputes/disputes.module';
 import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
@@ -35,6 +38,9 @@ import { NotificationsModule } from './notifications/notifications.module';
     CategoriesModule,
     ReportsModule,
     CustomersModule,
+    VendorsModule,
+    PurchaseOrdersModule,
+    DisputesModule,
     NotificationsModule,
   ],
   controllers: [AppController],

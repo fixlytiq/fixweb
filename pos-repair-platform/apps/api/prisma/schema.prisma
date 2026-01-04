@@ -280,6 +280,7 @@ model Store {
   id             String           @id
   name           String
   timezone       String           @default("America/Chicago")
+  taxRate        Decimal?         @default(0.08) @db.Decimal(5, 4)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   storeEmail     String           @unique

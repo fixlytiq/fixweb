@@ -20,6 +20,7 @@ export default function SettingsPage() {
     storePhone: '',
     notificationEmail: '',
     timezone: 'America/Chicago',
+    taxRate: 0.08,
   });
   const [notifications, setNotifications] = useState({
     emailEnabled: true,
@@ -39,6 +40,7 @@ export default function SettingsPage() {
         storePhone: store.storePhone || '',
         notificationEmail: store.notificationEmail || store.storeEmail,
         timezone: store.timezone,
+        taxRate: store.taxRate || 0.08,
       });
     }
   }, [store]);
@@ -144,6 +146,25 @@ export default function SettingsPage() {
               onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
               placeholder="America/Chicago"
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="taxRate">Tax Rate (%)</Label>
+            <Input
+              id="taxRate"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={formData.taxRate ? (formData.taxRate * 100).toFixed(2) : '8.00'}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value) || 0;
+                setFormData({ ...formData, taxRate: value / 100 });
+              }}
+              placeholder="8.00"
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter tax rate as percentage (e.g., 8 for 8%). Tax rates may vary by state.
+            </p>
           </div>
           <Button onClick={handleSave} disabled={updateMutation.isPending || !formData.name || !formData.storeEmail}>
             {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
