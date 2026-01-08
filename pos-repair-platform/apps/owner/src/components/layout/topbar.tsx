@@ -3,6 +3,7 @@
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export function TopBar() {
   const { user } = useAuth();
@@ -20,6 +21,7 @@ export function TopBar() {
         </div>
       </div>
       <div className="flex items-center gap-4">
+        <ThemeToggle />
         <div className="text-sm text-muted-foreground">
           Store ID: {user?.storeId?.slice(0, 8) || 'N/A'}
         </div>

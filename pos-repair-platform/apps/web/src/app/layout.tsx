@@ -29,7 +29,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider defaultTheme="system" storageKey="fixlytiq-theme">
+        <ThemeProvider defaultTheme="dark" storageKey="fixlytiq-theme">
           <AuthProvider>
             {children}
           </AuthProvider>

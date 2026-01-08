@@ -4,9 +4,9 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/pos-repair-api:$COMMIT_SHA'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$SHORT_SHA'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/pos-repair-api:latest'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:latest'
       - '-f'
       - 'apps/api/Dockerfile'
       - '.'
@@ -16,60 +16,160 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/pos-repair-web:$COMMIT_SHA'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:$SHORT_SHA'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/pos-repair-web:latest'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:latest'
       - '--build-arg'
-      - 'NEXT_PUBLIC_API_URL=https://api.yourdomain.com'
+      - 'NEXT_PUBLIC_API_URL=https://pos-repair-api-986263545678.us-central1.run.app'
       - '-f'
       - 'apps/web/Dockerfile'
       - '.'
+
+  # Build Owner image (optional - uncomment when ready to deploy)
+  # - name: 'gcr.io/cloud-builders/docker'
+  #   args:
+  #     - 'build'
+  #     - '-t'
+  #     - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-owner:$SHORT_SHA'
+  #     - '-t'
+  #     - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-owner:latest'
+  #     - '--build-arg'
+  #     - 'NEXT_PUBLIC_API_URL=https://pos-repair-api-986263545678.us-central1.run.app'
+  #     - '-f'
+  #     - 'apps/owner/Dockerfile'
+  #     - '.'
 
   # Push API image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/pos-repair-api:$COMMIT_SHA'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$SHORT_SHA'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/pos-repair-api:latest'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:latest'
 
   # Push Web image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/pos-repair-web:$COMMIT_SHA'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:$SHORT_SHA'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/pos-repair-web:latest'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:latest'
 
-  # Deploy to Cloud Run (optional - uncomment if using Cloud Run)
+  # Push Owner image (optional - uncomment when ready to deploy)
+  # - name: 'gcr.io/cloud-builders/docker'
+  #   args:
+  #     - 'push'
+  #     - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-owner:$SHORT_SHA'
+
+  # - name: 'gcr.io/cloud-builders/docker'
+  #   args:
+  #     - 'push'
+  #     - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-owner:latest'
+
+  # Deploy API to Cloud Run (updates existing service)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'pos-repair-api'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$SHORT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--no-traffic'
+      - '--tag'
+      - 'latest'
+
+  # Deploy Web to Cloud Run (updates existing service)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'pos-repair-web'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:$SHORT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--no-traffic'
+      - '--tag'
+      - 'latest'
+
+  # Deploy Owner to Cloud Run (optional - uncomment when ready to deploy)
   # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   #   entrypoint: gcloud
   #   args:
   #     - 'run'
   #     - 'deploy'
-  #     - 'pos-repair-api'
+  #     - 'pos-repair-owner'
   #     - '--image'
-  #     - 'gcr.io/$PROJECT_ID/pos-repair-api:$COMMIT_SHA'
+  #     - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-owner:$SHORT_SHA'
   #     - '--region'
   #     - 'us-central1'
   #     - '--platform'
   #     - 'managed'
+  #     - '--no-traffic'
+  #     - '--tag'
+  #     - 'latest'
+
+  # Migrate traffic to new revisions
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'update-traffic'
+      - 'pos-repair-api'
+      - '--to-latest'
+      - '--region'
+      - 'us-central1'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'update-traffic'
+      - 'pos-repair-web'
+      - '--to-latest'
+      - '--region'
+      - 'us-central1'
+
+  # Migrate traffic for Owner (optional - uncomment when ready)
+  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  #   entrypoint: gcloud
+  #   args:
+  #     - 'run'
+  #     - 'services'
+  #     - 'update-traffic'
+  #     - 'pos-repair-owner'
+  #     - '--to-latest'
+  #     - '--region'
+  #     - 'us-central1'
 
 images:
-  - 'gcr.io/$PROJECT_ID/pos-repair-api:$COMMIT_SHA'
-  - 'gcr.io/$PROJECT_ID/pos-repair-api:latest'
-  - 'gcr.io/$PROJECT_ID/pos-repair-web:$COMMIT_SHA'
-  - 'gcr.io/$PROJECT_ID/pos-repair-web:latest'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:latest'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:latest'
+  # Owner images (uncomment when ready)
+  # - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-owner:$SHORT_SHA'
+  # - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-owner:latest'
 
 options:
   machineType: 'E2_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
 
-timeout: '1200s'
+timeout: '3600s'
 
