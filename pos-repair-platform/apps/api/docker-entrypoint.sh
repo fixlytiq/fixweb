@@ -130,25 +130,57 @@ EOF
     # Check if it's a failed migration issue (P3009)
     if echo "$MIGRATE_OUTPUT" | grep -q "P3009\|failed migrations"; then
       echo "Resolving failed migrations..."
-      # Extract migration name from error
-      FAILED_MIGRATION=$(echo "$MIGRATE_OUTPUT" | grep -oE '[0-9]+_[a-z_]+' | head -n1 || echo "")
+      # Extract migration name from error - try multiple patterns
+      FAILED_MIGRATION=$(echo "$MIGRATE_OUTPUT" | grep -oE '[0-9]+_[a-z0-9_]+' | head -n1 || echo "")
+      if [ -z "$FAILED_MIGRATION" ]; then
+        # Try to get migration name from the error message
+        FAILED_MIGRATION=$(echo "$MIGRATE_OUTPUT" | grep -oE '20250[0-9]+_[a-z0-9_]+' | head -n1 || echo "")
+      fi
       if [ -n "$FAILED_MIGRATION" ]; then
         echo "Marking migration $FAILED_MIGRATION as rolled back..."
-        "$PRISMA_BIN" migrate resolve --rolled-back "$FAILED_MIGRATION" --schema=apps/api/prisma/schema.prisma || true
+        "$PRISMA_BIN" migrate resolve --rolled-back "$FAILED_MIGRATION" --schema=apps/api/prisma/schema.prisma || {
+          echo "Warning: Could not mark migration as rolled back, trying to mark as applied instead..."
+          "$PRISMA_BIN" migrate resolve --applied "$FAILED_MIGRATION" --schema=apps/api/prisma/schema.prisma || true
+        }
+        # Wait a moment
+        sleep 2
         # Retry migration
         echo "Retrying migrations..."
         "$PRISMA_BIN" migrate deploy --schema=apps/api/prisma/schema.prisma || {
-          echo "Migration retry failed!"
+          echo "Migration retry failed after resolving!"
+          echo "If this persists, you may need to manually resolve the migration in the database."
           exit 1
         }
       else
-        echo "Could not extract migration name!"
+        echo "Could not extract migration name from error!"
+        echo "Migration output: $MIGRATE_OUTPUT"
         exit 1
       fi
     elif [ -n "$MIGRATE_EXIT" ] && [ "$MIGRATE_EXIT" != "0" ]; then
-      echo "WARNING: Migration failed with exit code $MIGRATE_EXIT!"
-      echo "The application will start, but database migrations may need to be run manually."
-      echo "You can run migrations manually with: npx prisma migrate deploy"
+      # Check for P3018 (migration apply error) - mark as rolled back and retry
+      if echo "$MIGRATE_OUTPUT" | grep -q "P3018\|migration.*failed to apply"; then
+        echo "Migration apply failed (P3018), attempting to resolve..."
+        FAILED_MIGRATION=$(echo "$MIGRATE_OUTPUT" | grep -oE '[0-9]+_[a-z0-9_]+' | head -n1 || echo "")
+        if [ -z "$FAILED_MIGRATION" ]; then
+          FAILED_MIGRATION=$(echo "$MIGRATE_OUTPUT" | grep -oE '20250[0-9]+_[a-z0-9_]+' | head -n1 || echo "")
+        fi
+        if [ -n "$FAILED_MIGRATION" ]; then
+          echo "Marking migration $FAILED_MIGRATION as rolled back and retrying..."
+          "$PRISMA_BIN" migrate resolve --rolled-back "$FAILED_MIGRATION" --schema=apps/api/prisma/schema.prisma || true
+          sleep 2
+          "$PRISMA_BIN" migrate deploy --schema=apps/api/prisma/schema.prisma || {
+            echo "Migration retry failed after resolving!"
+            exit 1
+          }
+        else
+          echo "Migration failed but could not extract migration name!"
+          exit 1
+        fi
+      else
+        echo "WARNING: Migration failed with exit code $MIGRATE_EXIT!"
+        echo "The application will start, but database migrations may need to be run manually."
+        echo "You can run migrations manually with: npx prisma migrate deploy"
+      fi
     fi
   fi
   
