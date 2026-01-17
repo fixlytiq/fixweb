@@ -31,11 +31,13 @@ BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Store')
        AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Store' AND column_name = 'organizationId') THEN
         -- For each store, create an owner using the first user's email from memberships
-        INSERT INTO "Owner" ("id", "email", "password")
+        INSERT INTO "Owner" ("id", "email", "password", "createdAt", "updatedAt")
         SELECT 
             gen_random_uuid()::text as id,
             COALESCE(u.email, 'temp_' || s.id || '@temp.com') as email,
-            '$2a$10$temp' as password
+            '$2a$10$temp' as password,
+            NOW() as "createdAt",
+            NOW() as "updatedAt"
         FROM "Store" s
         LEFT JOIN "Membership" m ON m."organizationId" = s."organizationId"
         LEFT JOIN "User" u ON u.id = m."userId"
@@ -45,11 +47,13 @@ BEGIN
         GROUP BY s.id, COALESCE(u.email, 'temp_' || s.id || '@temp.com');
     ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Store') THEN
         -- If Store table exists but organizationId column doesn't, create owners without organization reference
-        INSERT INTO "Owner" ("id", "email", "password")
+        INSERT INTO "Owner" ("id", "email", "password", "createdAt", "updatedAt")
         SELECT 
             gen_random_uuid()::text as id,
             'temp_' || s.id || '@temp.com' as email,
-            '$2a$10$temp' as password
+            '$2a$10$temp' as password,
+            NOW() as "createdAt",
+            NOW() as "updatedAt"
         FROM "Store" s
         WHERE NOT EXISTS (
             SELECT 1 FROM "Owner" o WHERE o.email = 'temp_' || s.id || '@temp.com'
