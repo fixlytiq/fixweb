@@ -39,6 +39,10 @@ RUN apk add --no-cache wget
 COPY --from=builder /app/apps/owner/.next/standalone ./
 COPY --from=builder /app/apps/owner/.next/static ./apps/owner/.next/static
 
+# Copy node_modules for packages (if used)
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+
 # Copy public directory if it exists (optional)
 RUN mkdir -p ./apps/owner/public
 
