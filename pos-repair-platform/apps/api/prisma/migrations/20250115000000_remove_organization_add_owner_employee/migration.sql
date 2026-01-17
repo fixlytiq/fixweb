@@ -196,48 +196,63 @@ ALTER TABLE "Dispute" DROP COLUMN IF EXISTS "organizationId";
 ALTER TABLE "TimeClock" DROP CONSTRAINT IF EXISTS "TimeClock_organizationId_fkey";
 ALTER TABLE "TimeClock" DROP COLUMN IF EXISTS "organizationId";
 ALTER TABLE "TimeClock" ADD COLUMN IF NOT EXISTS "employeeId" TEXT;
--- Map existing userId to employeeId (if possible)
-UPDATE "TimeClock" tc
-SET "employeeId" = (
-    SELECT e.id 
-    FROM "Employee" e 
-    JOIN "User" u ON u."passwordHash" = e.pin
-    WHERE u.id = tc."userId" 
-    AND e."storeId" = tc."storeId"
-    LIMIT 1
-)
-WHERE "employeeId" IS NULL;
--- For time clocks without matching employees, create temporary employees
-INSERT INTO "Employee" ("id", "name", "pin", "role", "storeId")
-SELECT DISTINCT
-    gen_random_uuid()::text as id,
-    COALESCE(u."firstName" || ' ' || u."lastName", u.email, 'Employee') as name,
-    u."passwordHash" as pin,
-    'TECHNICIAN'::"StoreRole" as role,
-    tc."storeId"
-FROM "TimeClock" tc
-JOIN "User" u ON u.id = tc."userId"
-WHERE NOT EXISTS (
-    SELECT 1 FROM "Employee" e 
-    WHERE e."storeId" = tc."storeId" 
-    AND e.pin = u."passwordHash"
-)
-AND tc."employeeId" IS NULL
-ON CONFLICT DO NOTHING;
 
--- Update TimeClock employeeId again after creating employees
-UPDATE "TimeClock" tc
-SET "employeeId" = (
-    SELECT e.id 
-    FROM "Employee" e 
-    JOIN "User" u ON u."passwordHash" = e.pin
-    WHERE u.id = tc."userId" 
-    AND e."storeId" = tc."storeId"
-    LIMIT 1
-)
-WHERE "employeeId" IS NULL;
+-- Map existing userId to employeeId (if userId column exists)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'TimeClock' AND column_name = 'userId') THEN
+        -- Map existing userId to employeeId (if possible)
+        UPDATE "TimeClock" tc
+        SET "employeeId" = (
+            SELECT e.id 
+            FROM "Employee" e 
+            JOIN "User" u ON u."passwordHash" = e.pin
+            WHERE u.id = tc."userId" 
+            AND e."storeId" = tc."storeId"
+            LIMIT 1
+        )
+        WHERE "employeeId" IS NULL;
+        
+        -- For time clocks without matching employees, create temporary employees
+        INSERT INTO "Employee" ("id", "name", "pin", "role", "storeId")
+        SELECT DISTINCT
+            gen_random_uuid()::text as id,
+            COALESCE(u."firstName" || ' ' || u."lastName", u.email, 'Employee') as name,
+            u."passwordHash" as pin,
+            'TECHNICIAN'::"StoreRole" as role,
+            tc."storeId"
+        FROM "TimeClock" tc
+        JOIN "User" u ON u.id = tc."userId"
+        WHERE NOT EXISTS (
+            SELECT 1 FROM "Employee" e 
+            WHERE e."storeId" = tc."storeId" 
+            AND e.pin = u."passwordHash"
+        )
+        AND tc."employeeId" IS NULL
+        ON CONFLICT DO NOTHING;
 
-ALTER TABLE "TimeClock" ALTER COLUMN "employeeId" SET NOT NULL;
+        -- Update TimeClock employeeId again after creating employees
+        UPDATE "TimeClock" tc
+        SET "employeeId" = (
+            SELECT e.id 
+            FROM "Employee" e 
+            JOIN "User" u ON u."passwordHash" = e.pin
+            WHERE u.id = tc."userId" 
+            AND e."storeId" = tc."storeId"
+            LIMIT 1
+        )
+        WHERE "employeeId" IS NULL;
+    END IF;
+END $$;
+
+-- Make employeeId required (only if it's still nullable)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'TimeClock' AND column_name = 'employeeId' AND is_nullable = 'YES') THEN
+        ALTER TABLE "TimeClock" ALTER COLUMN "employeeId" SET NOT NULL;
+    END IF;
+END $$;
+
 ALTER TABLE "TimeClock" DROP CONSTRAINT IF EXISTS "TimeClock_userId_fkey";
 ALTER TABLE "TimeClock" DROP COLUMN IF EXISTS "userId";
 
@@ -245,20 +260,36 @@ ALTER TABLE "TimeClock" DROP COLUMN IF EXISTS "userId";
 ALTER TABLE "Refund" DROP CONSTRAINT IF EXISTS "Refund_organizationId_fkey";
 ALTER TABLE "Refund" DROP COLUMN IF EXISTS "organizationId";
 ALTER TABLE "Refund" ADD COLUMN IF NOT EXISTS "refundedById" TEXT;
--- Map existing refundedById (which is userId) to employeeId
-UPDATE "Refund" r
-SET "refundedById" = (
-    SELECT e.id 
-    FROM "Employee" e 
-    JOIN "User" u ON u."passwordHash" = e.pin
-    WHERE u.id = r."refundedById" 
-    AND e."storeId" = r."storeId"
-    LIMIT 1
-)
-WHERE "refundedById" IS NOT NULL 
-AND EXISTS (SELECT 1 FROM "User" u WHERE u.id::text = r."refundedById"::text);
 
-ALTER TABLE "Refund" ALTER COLUMN "refundedById" SET NOT NULL;
+-- Map existing refundedById (which might be userId) to employeeId
+-- Only if the old refundedById column exists and contains userId values
+DO $$
+BEGIN
+    -- Check if there's an old refundedById column that might contain userIds
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Refund' AND column_name = 'refundedById' AND is_nullable = 'YES') THEN
+        -- Try to map existing userId values to employeeId
+        UPDATE "Refund" r
+        SET "refundedById" = (
+            SELECT e.id 
+            FROM "Employee" e 
+            JOIN "User" u ON u."passwordHash" = e.pin
+            WHERE u.id::text = r."refundedById"::text
+            AND e."storeId" = r."storeId"
+            LIMIT 1
+        )
+        WHERE "refundedById" IS NOT NULL 
+        AND EXISTS (SELECT 1 FROM "User" u WHERE u.id::text = r."refundedById"::text);
+    END IF;
+END $$;
+
+-- Make refundedById required (only if it's still nullable)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Refund' AND column_name = 'refundedById' AND is_nullable = 'YES') THEN
+        ALTER TABLE "Refund" ALTER COLUMN "refundedById" SET NOT NULL;
+    END IF;
+END $$;
+
 ALTER TABLE "Refund" DROP CONSTRAINT IF EXISTS "Refund_refundedById_fkey";
 
 -- Update WaiverTemplate
