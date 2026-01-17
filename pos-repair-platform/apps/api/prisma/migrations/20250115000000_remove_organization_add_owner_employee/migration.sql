@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS "Employee" (
 -- Step 1: Create temporary owners for existing stores (only if Store table exists)
 DO $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Store') THEN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Store')
+       AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Store' AND column_name = 'organizationId') THEN
         -- For each store, create an owner using the first user's email from memberships
         INSERT INTO "Owner" ("id", "email", "password")
         SELECT 
@@ -42,6 +43,18 @@ BEGIN
             SELECT 1 FROM "Owner" o WHERE o.email = COALESCE(u.email, 'temp_' || s.id || '@temp.com')
         )
         GROUP BY s.id, COALESCE(u.email, 'temp_' || s.id || '@temp.com');
+    ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Store') THEN
+        -- If Store table exists but organizationId column doesn't, create owners without organization reference
+        INSERT INTO "Owner" ("id", "email", "password")
+        SELECT 
+            gen_random_uuid()::text as id,
+            'temp_' || s.id || '@temp.com' as email,
+            '$2a$10$temp' as password
+        FROM "Store" s
+        WHERE NOT EXISTS (
+            SELECT 1 FROM "Owner" o WHERE o.email = 'temp_' || s.id || '@temp.com'
+        )
+        GROUP BY s.id;
     END IF;
 END $$;
 
@@ -53,26 +66,45 @@ BEGIN
         ALTER TABLE "Store" ADD COLUMN IF NOT EXISTS "storeEmail" TEXT;
 
         -- Step 3: Populate ownerId and storeEmail for existing stores
-        UPDATE "Store" s
-        SET 
-            "ownerId" = (
-                SELECT o.id 
-                FROM "Owner" o 
-                WHERE o.email = COALESCE(
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Store' AND column_name = 'organizationId') THEN
+            -- If organizationId exists, use it for the join
+            UPDATE "Store" s
+            SET 
+                "ownerId" = (
+                    SELECT o.id 
+                    FROM "Owner" o 
+                    WHERE o.email = COALESCE(
+                        (SELECT u.email FROM "Membership" m JOIN "User" u ON u.id = m."userId" WHERE m."organizationId" = s."organizationId" LIMIT 1),
+                        'temp_' || s.id || '@temp.com'
+                    )
+                    LIMIT 1
+                ),
+                "storeEmail" = COALESCE(
                     (SELECT u.email FROM "Membership" m JOIN "User" u ON u.id = m."userId" WHERE m."organizationId" = s."organizationId" LIMIT 1),
-                    'temp_' || s.id || '@temp.com'
+                    'store_' || s.id || '@temp.com'
                 )
-                LIMIT 1
-            ),
-            "storeEmail" = COALESCE(
-                (SELECT u.email FROM "Membership" m JOIN "User" u ON u.id = m."userId" WHERE m."organizationId" = s."organizationId" LIMIT 1),
-                'store_' || s.id || '@temp.com'
-            )
-        WHERE "ownerId" IS NULL;
+            WHERE "ownerId" IS NULL;
+        ELSE
+            -- If organizationId doesn't exist, just use temp email
+            UPDATE "Store" s
+            SET 
+                "ownerId" = (
+                    SELECT o.id 
+                    FROM "Owner" o 
+                    WHERE o.email = 'temp_' || s.id || '@temp.com'
+                    LIMIT 1
+                ),
+                "storeEmail" = 'store_' || s.id || '@temp.com'
+            WHERE "ownerId" IS NULL;
+        END IF;
 
-        -- Step 4: Make columns required
-        ALTER TABLE "Store" ALTER COLUMN "ownerId" SET NOT NULL;
-        ALTER TABLE "Store" ALTER COLUMN "storeEmail" SET NOT NULL;
+        -- Step 4: Make columns required (only if they're still nullable)
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Store' AND column_name = 'ownerId' AND is_nullable = 'YES') THEN
+            ALTER TABLE "Store" ALTER COLUMN "ownerId" SET NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Store' AND column_name = 'storeEmail' AND is_nullable = 'YES') THEN
+            ALTER TABLE "Store" ALTER COLUMN "storeEmail" SET NOT NULL;
+        END IF;
     END IF;
 END $$;
 
@@ -134,7 +166,14 @@ ALTER TABLE "StockMovement" DROP COLUMN IF EXISTS "organizationId";
 ALTER TABLE "Vendor" DROP CONSTRAINT IF EXISTS "Vendor_organizationId_fkey";
 ALTER TABLE "Vendor" DROP COLUMN IF EXISTS "organizationId";
 ALTER TABLE "Vendor" ADD COLUMN IF NOT EXISTS "storeId" TEXT;
-UPDATE "Vendor" v SET "storeId" = (SELECT s.id FROM "Store" s WHERE s."organizationId" = v."organizationId" LIMIT 1) WHERE "storeId" IS NULL;
+-- Only update storeId if organizationId columns exist
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Store' AND column_name = 'organizationId')
+       AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Vendor' AND column_name = 'organizationId') THEN
+        UPDATE "Vendor" v SET "storeId" = (SELECT s.id FROM "Store" s WHERE s."organizationId" = v."organizationId" LIMIT 1) WHERE "storeId" IS NULL;
+    END IF;
+END $$;
 ALTER TABLE "Vendor" ALTER COLUMN "storeId" SET NOT NULL;
 
 -- Update PurchaseOrder
@@ -222,7 +261,14 @@ ALTER TABLE "Refund" DROP CONSTRAINT IF EXISTS "Refund_refundedById_fkey";
 ALTER TABLE "WaiverTemplate" DROP CONSTRAINT IF EXISTS "WaiverTemplate_organizationId_fkey";
 ALTER TABLE "WaiverTemplate" DROP COLUMN IF EXISTS "organizationId";
 ALTER TABLE "WaiverTemplate" ADD COLUMN IF NOT EXISTS "storeId" TEXT;
-UPDATE "WaiverTemplate" wt SET "storeId" = (SELECT s.id FROM "Store" s WHERE s."organizationId" = wt."organizationId" LIMIT 1) WHERE "storeId" IS NULL;
+-- Only update storeId if organizationId columns exist
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Store' AND column_name = 'organizationId')
+       AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'WaiverTemplate' AND column_name = 'organizationId') THEN
+        UPDATE "WaiverTemplate" wt SET "storeId" = (SELECT s.id FROM "Store" s WHERE s."organizationId" = wt."organizationId" LIMIT 1) WHERE "storeId" IS NULL;
+    END IF;
+END $$;
 ALTER TABLE "WaiverTemplate" ALTER COLUMN "storeId" SET NOT NULL;
 
 -- Update Customer

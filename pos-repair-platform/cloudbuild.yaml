@@ -4,7 +4,7 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$BUILD_ID'
       - '-t'
       - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:latest'
       - '-f'
@@ -16,7 +16,7 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:$BUILD_ID'
       - '-t'
       - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:latest'
       - '--build-arg'
@@ -43,7 +43,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$BUILD_ID'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -54,7 +54,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:$BUILD_ID'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -80,7 +80,7 @@ steps:
       - 'deploy'
       - 'pos-repair-api'
       - '--image'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$BUILD_ID'
       - '--region'
       - 'us-central1'
       - '--platform'
@@ -97,7 +97,7 @@ steps:
       - 'deploy'
       - 'pos-repair-web'
       - '--image'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:$BUILD_ID'
       - '--region'
       - 'us-central1'
       - '--platform'
@@ -159,9 +159,9 @@ steps:
   #     - 'us-central1'
 
 images:
-  - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$BUILD_ID'
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:latest'
-  - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:$BUILD_ID'
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-web:latest'
   # Owner images (uncomment when ready)
   # - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-owner:$SHORT_SHA'
