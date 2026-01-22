@@ -44,7 +44,7 @@ chmod +x scripts/setup-gcp-from-scratch.sh
 | `_DATABASE_URL` | `postgresql://SQL_USER:SQL_PASSWORD@/SQL_DATABASE?host=/cloudsql/CONNECTION_NAME` |
 | `_REDIS_HOST` | `REDIS_IP` |
 | `_JWT_SECRET` | `JWT_SECRET` |
-| `_FRONTEND_URL` | `https://pos-repair-web-PROJECT_NUMBER.us-central1.run.app,https://pos-repair-owner-PROJECT_NUMBER.us-central1.run.app` |
+| `_FRONTEND_URL` | `https://pos-repair-web-PROJECT_NUMBER.us-central1.run.app;https://pos-repair-owner-PROJECT_NUMBER.us-central1.run.app` (semicolons) |
 
 ## Step 4: Deploy
 

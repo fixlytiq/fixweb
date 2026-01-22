@@ -105,9 +105,7 @@ steps:
       - '--vpc-connector'
       - '${_VPC_CONNECTOR}'
       - '--set-env-vars'
-      - 'DATABASE_URL=${_DATABASE_URL},REDIS_HOST=${_REDIS_HOST},REDIS_PORT=6379,REDIS_PASSWORD=,JWT_SECRET=${_JWT_SECRET},NODE_ENV=production,PORT=8080'
-      - '--update-env-vars'
-      - 'FRONTEND_URL=${_FRONTEND_URL}'
+      - 'DATABASE_URL=${_DATABASE_URL},REDIS_HOST=${_REDIS_HOST},REDIS_PORT=6379,REDIS_PASSWORD=,JWT_SECRET=${_JWT_SECRET},NODE_ENV=production,PORT=8080,FRONTEND_URL=${_FRONTEND_URL}'
 
   # Deploy Web to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'

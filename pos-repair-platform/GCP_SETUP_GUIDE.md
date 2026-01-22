@@ -336,16 +336,16 @@ You should now see your repository listed.
    | `_DATABASE_URL` | `postgresql://SQL_USER:SQL_PASSWORD@/SQL_DATABASE?host=/cloudsql/CONNECTION_NAME` |
    | `_REDIS_HOST` | `REDIS_IP` value |
    | `_JWT_SECRET` | `JWT_SECRET` value |
-   | `_FRONTEND_URL` | `https://pos-repair-web-PROJECT_NUMBER.us-central1.run.app,https://pos-repair-owner-PROJECT_NUMBER.us-central1.run.app` |
+   | `_FRONTEND_URL` | `https://pos-repair-web-PROJECT_NUMBER.us-central1.run.app;https://pos-repair-owner-PROJECT_NUMBER.us-central1.run.app` (use **semicolons**, not commas) |
 
    **Example `_DATABASE_URL` format:**
    ```
    postgresql://posrepair_user:YOUR_PASSWORD@/pos_repair_platform?host=/cloudsql/YOUR_PROJECT_ID:us-central1:pos-repair-postgres
    ```
 
-   **Example `_FRONTEND_URL` format:**
+   **Example `_FRONTEND_URL` format (use semicolons, not commas):**
    ```
-   https://pos-repair-web-123456789.us-central1.run.app,https://pos-repair-owner-123456789.us-central1.run.app
+   https://pos-repair-web-123456789.us-central1.run.app;https://pos-repair-owner-123456789.us-central1.run.app
    ```
    
    Replace `123456789` with your actual `PROJECT_NUMBER` from `.gcp-config`.

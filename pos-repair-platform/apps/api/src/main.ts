@@ -24,7 +24,7 @@ async function bootstrap() {
   } else {
     // In production, use configured origins
     allowedOrigins = process.env.FRONTEND_URL 
-      ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+      ? process.env.FRONTEND_URL.split(/[,;]/).map((url) => url.trim()).filter(Boolean)
       : ['http://localhost:3001', 'http://localhost:3002'];
   }
   

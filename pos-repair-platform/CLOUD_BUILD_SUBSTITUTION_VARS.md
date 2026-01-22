@@ -46,10 +46,12 @@ Example: abc123xyz789... (32+ character string)
 
 ### 6. `_FRONTEND_URL`
 ```
-Format: https://pos-repair-web-[PROJECT_NUMBER].us-central1.run.app,https://pos-repair-owner-[PROJECT_NUMBER].us-central1.run.app
+Use semicolons (;) to separate URLs—commas break gcloud --set-env-vars.
+
+Format: https://pos-repair-web-[PROJECT_NUMBER].us-central1.run.app;https://pos-repair-owner-[PROJECT_NUMBER].us-central1.run.app
 
 Example:
-https://pos-repair-web-123456789.us-central1.run.app,https://pos-repair-owner-123456789.us-central1.run.app
+https://pos-repair-web-123456789.us-central1.run.app;https://pos-repair-owner-123456789.us-central1.run.app
 
 Replace [PROJECT_NUMBER] with PROJECT_NUMBER from .gcp-config
 ```
@@ -64,7 +66,7 @@ _VPC_CONNECTOR = pos-repair-connector
 _DATABASE_URL = postgresql://[SQL_USER]:[SQL_PASSWORD]@/[SQL_DATABASE]?host=/cloudsql/[CONNECTION_NAME]
 _REDIS_HOST = [REDIS_IP]
 _JWT_SECRET = [JWT_SECRET]
-_FRONTEND_URL = https://pos-repair-web-[PROJECT_NUMBER].us-central1.run.app,https://pos-repair-owner-[PROJECT_NUMBER].us-central1.run.app
+_FRONTEND_URL = https://pos-repair-web-[PROJECT_NUMBER].us-central1.run.app;https://pos-repair-owner-[PROJECT_NUMBER].us-central1.run.app
 ```
 
 ## Verification
@@ -72,7 +74,7 @@ _FRONTEND_URL = https://pos-repair-web-[PROJECT_NUMBER].us-central1.run.app,http
 After setting up the trigger, verify:
 1. All variable names start with underscore `_`
 2. `_DATABASE_URL` uses Unix socket format (`/cloudsql/...`)
-3. `_FRONTEND_URL` includes both web and owner URLs (comma-separated)
+3. `_FRONTEND_URL` includes both web and owner URLs (semicolon-separated; commas break gcloud)
 4. `_REDIS_HOST` is the IP address (not hostname)
 5. All values match exactly what's in `.gcp-config`
 

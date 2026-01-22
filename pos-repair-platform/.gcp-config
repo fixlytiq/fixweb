@@ -1,24 +1,36 @@
-# GCP Configuration - DO NOT COMMIT THIS FILE
+﻿# GCP Configuration - DO NOT COMMIT THIS FILE
 # Generated during setup
 
-PROJECT_ID=pos-repair-platform
+PROJECT_ID=repair-pos-485101
+PROJECT_NUMBER=233232647471
 REGION=us-central1
 ZONE=us-central1-a
 
 # Redis (Memorystore)
 REDIS_INSTANCE=pos-repair-redis
-REDIS_IP=10.200.206.67
+REDIS_IP=10.75.215.211
 REDIS_PORT=6379
 
 # PostgreSQL (Cloud SQL)
 SQL_INSTANCE=pos-repair-postgres
 SQL_DATABASE=pos_repair_platform
 SQL_USER=posrepair_user
-SQL_PASSWORD=SecureDBPass123!
-SQL_ROOT_PASSWORD=TempPassword123!
-CONNECTION_NAME=pos-repair-platform:us-central1:pos-repair-postgres
+SQL_PASSWORD=yDk428pJlBToNjZV
+SQL_ROOT_PASSWORD=IJqto0dv3AjxRHKL
+CONNECTION_NAME=repair-pos-485101:us-central1:pos-repair-postgres
 
 # VPC
 VPC_CONNECTOR=pos-repair-connector
 VPC_NETWORK=pos-repair-network
 VPC_SUBNET=pos-repair-subnet
+
+# Artifact Registry
+ARTIFACT_REPO=pos-repair-images
+ARTIFACT_REGISTRY=us-central1-docker.pkg.dev/repair-pos-485101/pos-repair-images
+
+# JWT (for Cloud Build substitution variables)
+JWT_SECRET=IWFKzVLkERlDJ0iX1caYCvpmqMBuxSfj
+
+# Cloud Run URLs (will be available after first deployment)
+API_URL=https://pos-repair-api-233232647471.us-central1.run.app
+WEB_URL=https://pos-repair-web-233232647471.us-central1.run.app

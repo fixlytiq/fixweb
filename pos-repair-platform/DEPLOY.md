@@ -74,7 +74,7 @@ The script will:
    | `_DATABASE_URL`         | `postgresql://USER:PASSWORD@/DB?host=/cloudsql/CONNECTION_NAME` (use `SQL_USER`, `SQL_PASSWORD`, `SQL_DATABASE`, `CONNECTION_NAME`) |
    | `_REDIS_HOST`           | `REDIS_IP` from `.gcp-config`             |
    | `_JWT_SECRET`           | `JWT_SECRET` from `.gcp-config`           |
-   | `_FRONTEND_URL`         | `https://pos-repair-web-PROJECT_NUMBER.us-central1.run.app,https://pos-repair-owner-PROJECT_NUMBER.us-central1.run.app` (use `PROJECT_NUMBER` from `.gcp-config`) |
+   | `_FRONTEND_URL`         | `https://pos-repair-web-PROJECT_NUMBER.us-central1.run.app;https://pos-repair-owner-PROJECT_NUMBER.us-central1.run.app` (semicolons; use `PROJECT_NUMBER` from `.gcp-config`) |
 
    **Example** (adjust to your `.gcp-config`):
 
@@ -83,7 +83,7 @@ The script will:
    - `_DATABASE_URL` = `postgresql://posrepair_user:YOUR_PASSWORD@/pos_repair_platform?host=/cloudsql/my-project:us-central1:pos-repair-postgres`  
    - `_REDIS_HOST` = `10.x.x.x` (Memorystore IP)  
    - `_JWT_SECRET` = (value from `.gcp-config`)  
-   - `_FRONTEND_URL` = `https://pos-repair-web-123456789.us-central1.run.app,https://pos-repair-owner-123456789.us-central1.run.app`  
+   - `_FRONTEND_URL` = `https://pos-repair-web-123456789.us-central1.run.app;https://pos-repair-owner-123456789.us-central1.run.app`  
 
 4. Click **“Create”**.
 

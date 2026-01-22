@@ -32,6 +32,9 @@ Thumbs.db
 # Docker
 .docker/
 
+# GCP Configuration (contains secrets)
+.gcp-config
+
 # Coverage
 coverage/
 .nyc_output/

@@ -1,5 +1,19 @@
 # Deploy to GCP - Quick Steps
 
+## ⚠️ IMPORTANT: Update your trigger (fixes build failure)
+
+If builds failed with **"Bad syntax for dict arg"** for `FRONTEND_URL`, your trigger uses **commas** in `_FRONTEND_URL`. gcloud treats commas as separators, so we use **semicolons** instead.
+
+1. Open [Cloud Build Triggers](https://console.cloud.google.com/cloud-build/triggers?project=repair-pos-485101).
+2. **Edit** your trigger (e.g. `Deploy-Main`).
+3. Find **Substitution variables** → `_FRONTEND_URL`.
+4. Change **commas** to **semicolons**:
+   - **Before:** `https://...web...run.app,https://...owner...run.app`
+   - **After:** `https://...web...run.app;https://...owner...run.app`
+5. Save, then `git push origin main` again.
+
+---
+
 ## Current Status
 - ✅ All GCP resources created (Cloud SQL still creating - 5-10 min)
 - ✅ All applications configured (API, Web, Owner)
@@ -67,7 +81,7 @@ gcloud sql users create $SQL_USER --instance=$SQL_INSTANCE --password=$DB_PASSWO
    | `_DATABASE_URL` | `postgresql://posrepair_user:yDk428pJlBToNjZV@/pos_repair_platform?host=/cloudsql/repair-pos-485101:us-central1:pos-repair-postgres` |
    | `_REDIS_HOST` | `10.75.215.211` |
    | `_JWT_SECRET` | `IWFKzVLkERlDJ0iX1caYCvpmqMBuxSfj` |
-   | `_FRONTEND_URL` | `https://pos-repair-web-233232647471.us-central1.run.app,https://pos-repair-owner-233232647471.us-central1.run.app` |
+   | `_FRONTEND_URL` | `https://pos-repair-web-233232647471.us-central1.run.app;https://pos-repair-owner-233232647471.us-central1.run.app` (use **semicolons**, not commas) |
 
 6. **Click "Create"**
 
