@@ -110,12 +110,12 @@ steps:
     args:
       - '-c'
       - |
-        gcloud run jobs execute pos-repair-migrate --region=us-central1 --wait || EXIT=$?
-        if [ "${EXIT:-0}" -ne 0 ]; then
+        gcloud run jobs execute pos-repair-migrate --region=us-central1 --wait || EXIT=$$?
+        if [ "$${EXIT:-0}" -ne 0 ]; then
           echo "=== Migration job failed. Recent job logs ==="
           gcloud run jobs logs read pos-repair-migrate --region=us-central1 --limit=80 2>/dev/null || true
           echo "=== End logs ==="
-          exit ${EXIT}
+          exit $${EXIT}
         fi
     id: 'run-migrations'
     waitFor: ['deploy-migrate-job']
