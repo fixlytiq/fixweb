@@ -75,6 +75,45 @@ steps:
       - 'push'
       - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-owner:latest'
 
+  # Run DB migrations via Cloud Run Job (so API container can start without running migrations)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'jobs'
+      - 'deploy'
+      - 'pos-repair-migrate'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$BUILD_ID'
+      - '--region'
+      - 'us-central1'
+      - '--set-cloudsql-instances'
+      - '${_SQL_CONNECTION_NAME}'
+      - '--vpc-connector'
+      - '${_VPC_CONNECTOR}'
+      - '--vpc-egress'
+      - 'all-traffic'
+      - '--set-env-vars'
+      - 'DATABASE_URL=${_DATABASE_URL},RUN_MIGRATIONS_ONLY=1'
+      - '--task-timeout'
+      - '300'
+      - '--max-retries'
+      - '0'
+    id: 'deploy-migrate-job'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'jobs'
+      - 'execute'
+      - 'pos-repair-migrate'
+      - '--region'
+      - 'us-central1'
+      - '--wait'
+    id: 'run-migrations'
+    waitFor: ['deploy-migrate-job']
+
   # Deploy API to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
