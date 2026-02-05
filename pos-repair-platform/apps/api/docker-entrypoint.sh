@@ -1,13 +1,37 @@
 #!/bin/sh
 set -e
 
+# Wait for Cloud SQL Proxy to mount the Unix socket (Cloud Run)
+wait_for_cloudsql_socket() {
+  if ! echo "$DATABASE_URL" | grep -q "/cloudsql/"; then
+    return 0
+  fi
+  # Extract socket path: host=/cloudsql/PROJECT:REGION:INSTANCE -> /cloudsql/PROJECT:REGION:INSTANCE
+  SOCKET_PATH=$(echo "$DATABASE_URL" | sed -n 's|.*/cloudsql/\([^?]*\).*|/cloudsql/\1|p')
+  if [ -z "$SOCKET_PATH" ]; then
+    return 0
+  fi
+  echo "Waiting for Cloud SQL socket at $SOCKET_PATH..."
+  RETRIES=30
+  while [ $RETRIES -gt 0 ]; do
+    if [ -e "$SOCKET_PATH" ] || [ -S "$SOCKET_PATH" ]; then
+      echo "Cloud SQL socket is ready."
+      return 0
+    fi
+    echo "Socket not ready, waiting... ($RETRIES retries left)"
+    RETRIES=$((RETRIES-1))
+    sleep 2
+  done
+  echo "Warning: Cloud SQL socket did not appear in time, continuing anyway..."
+}
+
 wait_for_postgres() {
   echo "Checking PostgreSQL connection..."
   
   # Check if using Cloud SQL Unix socket (Cloud Run)
   if echo "$DATABASE_URL" | grep -q "/cloudsql/"; then
+    wait_for_cloudsql_socket
     echo "Detected Cloud SQL Unix socket connection - skipping host/port check"
-    # For Cloud SQL, we'll let Prisma handle the connection
     return 0
   fi
   
