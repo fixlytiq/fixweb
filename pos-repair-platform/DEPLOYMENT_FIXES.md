@@ -68,6 +68,41 @@ Make sure your trigger has ALL of these:
    git push origin main
    ```
 
+## Senior Dev Checklist (Fixlytiq)
+
+### 1. Initial Deploy – No `--no-traffic`
+- **Done:** We do **not** use `--no-traffic` in `cloudbuild.yaml`. First deploy sends 100% traffic to the new revision.
+- If you add `--no-traffic` later for staged rollouts, use it only when the service already has at least one revision.
+
+### 2. VPC Connector & Egress
+- **Region:** Connector must be in the same region as Cloud Run (`us-central1`). Our connector: `pos-repair-connector`.
+- **Configured in deploy:** API deploy uses `--vpc-connector` and `--vpc-egress=all-traffic` so the API can reach:
+  - **Private IPs:** Cloud SQL (if using private IP) and Memorystore Redis.
+  - **Public internet:** Twilio (SMS) and SMTP (email) for notifications.
+- If you ever switch to **private-only** egress (no Twilio/SMTP), use `--vpc-egress=private-ranges-only`.
+
+### 3. Database & Migrations
+- **Entrypoint:** The API Docker image uses `docker-entrypoint.sh`, which runs `prisma migrate deploy` before starting the app. Schema is ready before the process listens.
+- **start:prod:** `apps/api/package.json` has `"start:prod": "prisma migrate deploy --schema=prisma/schema.prisma && node dist/main"` for non-Docker production runs.
+- **Connection:** We use **Cloud SQL Proxy** (Unix socket) via `--add-cloudsql-instances` and `DATABASE_URL` with `?host=/cloudsql/PROJECT:REGION:INSTANCE`. Alternative: private IP in VPC with `postgresql://user:password@PRIVATE_IP:5432/dbname` and no `--add-cloudsql-instances` (connector still needed for Redis).
+
+### 4. Build-Time Env (Next.js)
+- **Web & Owner:** Both Docker builds receive `--build-arg NEXT_PUBLIC_API_URL=https://pos-repair-api-${_PROJECT_NUMBER}.us-central1.run.app` in `cloudbuild.yaml`, so the frontend does not call `localhost:3000` in production.
+- **Trigger:** Ensure `_PROJECT_NUMBER` is set in the Cloud Build trigger so the URL resolves correctly.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|--------|----------------|-----|
+| **Cloud Build fails at Deploy** | IAM | Grant Cloud Build Service Account: **Cloud Run Admin**, **Service Account User**. |
+| **Cloud Run "Service Unavailable"** | API crashing on start | Check Cloud Run logs. Often: bad `DATABASE_URL`, DB not ready, or missing `JWT_SECRET`. |
+| **Web/Owner 404 or wrong API URL** | Build args | Confirm `NEXT_PUBLIC_API_URL` was passed in the Docker build step and `_PROJECT_NUMBER` is set in the trigger. |
+| **Redis connection timeout** | VPC / egress | API must use the VPC connector; ensure `--vpc-connector` and `--vpc-egress=all-traffic` (or `private-ranges-only` if Redis-only). |
+
+---
+
 ## Verification Checklist
 
 - [ ] `_PROJECT_NUMBER` added to trigger
@@ -76,3 +111,5 @@ Make sure your trigger has ALL of these:
 - [ ] Database and user exist in Cloud SQL
 - [ ] All other substitution variables are set
 - [ ] Code changes committed and pushed
+- [ ] Cloud Build SA has Cloud Run Admin + Service Account User
+- [ ] VPC connector is in `us-central1` and matches `_VPC_CONNECTOR`
