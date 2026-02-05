@@ -96,11 +96,15 @@ if [ "$RUN_MIGRATIONS_ONLY" = "1" ]; then
   cd /app
   PRISMA_BIN="/app/apps/api/node_modules/.bin/prisma"
   [ ! -f "$PRISMA_BIN" ] && PRISMA_BIN="/app/node_modules/.bin/prisma"
+  echo "Using Prisma at $PRISMA_BIN (exists: $(test -f "$PRISMA_BIN" && echo yes || echo no)), cwd=$(pwd)"
   if [ ! -f "$PRISMA_BIN" ]; then
     echo "Error: Prisma binary not found"
     exit 1
   fi
-  timeout -t 120 "$PRISMA_BIN" migrate deploy --schema=apps/api/prisma/schema.prisma || MIGRATE_EXIT=$?
+  echo "Executing: prisma migrate deploy --schema=apps/api/prisma/schema.prisma"
+  timeout -t 120 "$PRISMA_BIN" migrate deploy --schema=apps/api/prisma/schema.prisma 2>&1
+  MIGRATE_EXIT=$?
+  echo "Prisma exit code: $MIGRATE_EXIT"
   if [ "$MIGRATE_EXIT" = "124" ] || [ "$MIGRATE_EXIT" = "137" ]; then
     echo "ERROR: Migration timed out"
     exit 1
