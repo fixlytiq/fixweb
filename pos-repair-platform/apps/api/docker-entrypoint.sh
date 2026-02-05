@@ -12,7 +12,7 @@ wait_for_cloudsql_socket() {
     return 0
   fi
   echo "Waiting for Cloud SQL socket at $SOCKET_PATH..."
-  RETRIES=30
+  RETRIES=15
   while [ $RETRIES -gt 0 ]; do
     if [ -e "$SOCKET_PATH" ] || [ -S "$SOCKET_PATH" ]; then
       echo "Cloud SQL socket is ready."
@@ -145,11 +145,15 @@ EOF
       mv apps/api/prisma/schema.prisma.bak apps/api/prisma/schema.prisma
     fi
   else
-    # Prisma 6 - use schema with url
+    # Prisma 6 - use schema with url (timeout 90s so we don't hang and miss Cloud Run startup)
     echo "Detected Prisma 6, using schema with url..."
     cd /app
-    MIGRATE_OUTPUT=$("$PRISMA_BIN" migrate deploy --schema=apps/api/prisma/schema.prisma 2>&1) || MIGRATE_EXIT=$?
+    MIGRATE_OUTPUT=$(timeout -t 90 "$PRISMA_BIN" migrate deploy --schema=apps/api/prisma/schema.prisma 2>&1) || MIGRATE_EXIT=$?
     echo "$MIGRATE_OUTPUT"
+    if [ "$MIGRATE_EXIT" = "124" ] || [ "$MIGRATE_EXIT" = "137" ]; then
+      echo "ERROR: Migration timed out after 90s. Check DB connectivity and try again."
+      exit 1
+    fi
     
     # Check if it's a failed migration issue (P3009)
     if echo "$MIGRATE_OUTPUT" | grep -q "P3009\|failed migrations"; then

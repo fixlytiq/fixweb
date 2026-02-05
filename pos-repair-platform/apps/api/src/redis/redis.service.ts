@@ -36,6 +36,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.client = createClient({
         url,
         socket: {
+          connectTimeout: 10000,
           reconnectStrategy: (retries) => {
             if (retries > 10) {
               this.logger.error('Redis reconnection attempts exceeded');
