@@ -75,8 +75,41 @@ steps:
       - 'push'
       - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-owner:latest'
 
-  # Migrations and API deploy skipped for now (run migrations and API later when DB/VPC ready)
-  # - deploy-migrate-job, run-migrations, and pos-repair-api deploy are commented out
+  # Deploy API to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'pos-repair-api'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$BUILD_ID'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--tag'
+      - 'latest'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '10'
+      - '--cpu-boost'
+      - '--timeout'
+      - '300'
+      - '--add-cloudsql-instances'
+      - '${_SQL_CONNECTION_NAME}'
+      - '--vpc-connector'
+      - '${_VPC_CONNECTOR}'
+      - '--vpc-egress'
+      - 'all-traffic'
+      - '--set-env-vars'
+      - 'DATABASE_URL=${_DATABASE_URL},REDIS_HOST=${_REDIS_HOST},REDIS_PORT=6379,REDIS_PASSWORD=,JWT_SECRET=${_JWT_SECRET},NODE_ENV=production,FRONTEND_URL=${_FRONTEND_URL}'
 
   # Deploy Web to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -132,7 +165,18 @@ steps:
       - '--set-env-vars'
       - 'NEXT_PUBLIC_API_URL=https://pos-repair-api-${_PROJECT_NUMBER}.us-central1.run.app,NODE_ENV=production'
 
-  # Migrate traffic to new revisions (API skipped)
+  # Migrate traffic to new revisions
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'update-traffic'
+      - 'pos-repair-api'
+      - '--to-latest'
+      - '--region'
+      - 'us-central1'
+
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
