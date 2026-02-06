@@ -84,7 +84,11 @@ wait_for_postgres() {
   echo "Database is ready!"
 }
 
-wait_for_postgres
+# Only wait for DB when running the migration job. For the API service, start immediately
+# so Cloud Run sees the container listen on PORT in time; Prisma connects on first use.
+if [ "$RUN_MIGRATIONS_ONLY" = "1" ]; then
+  wait_for_postgres
+fi
 
 # When RUN_MIGRATIONS_ONLY=1 (e.g. Cloud Run Job), run migrations and exit. Service container skips migrations.
 if [ "$RUN_MIGRATIONS_ONLY" = "1" ]; then

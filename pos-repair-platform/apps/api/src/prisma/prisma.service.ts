@@ -9,26 +9,25 @@ export class PrismaService
   private readonly logger = new Logger(PrismaService.name);
 
   async onModuleInit(): Promise<void> {
-    // Retry connection with exponential backoff
-    let retries = 5;
-    let delay = 1000; // Start with 1 second
-    
-    while (retries > 0) {
+    // Do not block startup on DB connection (Cloud Run needs container to listen on PORT quickly).
+    // Prisma connects lazily on first query; optional: trigger connect in background.
+    setImmediate(() => this.connectWithRetry());
+  }
+
+  private async connectWithRetry(): Promise<void> {
+    let delay = 1000;
+    for (let attempt = 1; attempt <= 15; attempt++) {
       try {
         await this.$connect();
         this.logger.log('Successfully connected to database');
         return;
       } catch (error) {
-        retries--;
-        if (retries === 0) {
-          this.logger.error('Failed to connect to database after all retries', error);
-          throw error;
-        }
-        this.logger.warn(`Database connection failed, retrying in ${delay}ms... (${retries} retries left)`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        delay *= 2; // Exponential backoff
+        this.logger.warn(`Database connection attempt ${attempt}/15 failed, retrying in ${delay}ms...`);
+        await new Promise((r) => setTimeout(r, delay));
+        delay = Math.min(delay * 2, 10000);
       }
     }
+    this.logger.error('Database connection failed after 15 attempts; requests will fail until DB is reachable.');
   }
 
   async onModuleDestroy(): Promise<void> {

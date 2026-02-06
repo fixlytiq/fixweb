@@ -11,7 +11,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    await this.connect();
+    // Connect in background so Cloud Run sees the container listen on PORT quickly
+    setImmediate(() => this.connect());
   }
 
   async onModuleDestroy() {
