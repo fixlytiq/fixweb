@@ -82,8 +82,11 @@ Make sure your trigger has ALL of these:
 - If you ever switch to **private-only** egress (no Twilio/SMTP), use `--vpc-egress=private-ranges-only`.
 
 ### 3. Database & Migrations
-- **Entrypoint:** The API Docker image uses `docker-entrypoint.sh`, which runs `prisma migrate deploy` before starting the app. Schema is ready before the process listens.
-- **start:prod:** `apps/api/package.json` has `"start:prod": "prisma migrate deploy --schema=prisma/schema.prisma && node dist/main"` for non-Docker production runs.
+- **Pipeline:** Each build deploys the `pos-repair-migrate` job and runs it before deploying the API. If the job can't reach Cloud SQL (socket not ready), the step is allowed to fail and the rest of the build continues.
+- **Manual sync (when the job can't reach DB):** From a machine that can reach Postgres (e.g. with Cloud SQL Proxy), set `DATABASE_URL` and run:
+  - **Windows:** `.\scripts\run-migrations.ps1`
+  - **Bash:** `./scripts/run-migrations.sh`
+  - Example with Cloud SQL Proxy: start `cloud_sql_proxy -instances=repair-pos-485101:us-central1:pos-repair-postgres=tcp:5432`, then `DATABASE_URL="postgresql://posrepair_user:PASSWORD@127.0.0.1:5432/pos_repair_platform"` and run the script from `pos-repair-platform`.
 - **Connection:** We use **Cloud SQL Proxy** (Unix socket) via `--add-cloudsql-instances` and `DATABASE_URL` with `?host=/cloudsql/PROJECT:REGION:INSTANCE`. Alternative: private IP in VPC with `postgresql://user:password@PRIVATE_IP:5432/dbname` and no `--add-cloudsql-instances` (connector still needed for Redis).
 
 ### 4. Build-Time Env (Next.js)
