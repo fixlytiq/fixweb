@@ -75,6 +75,52 @@ steps:
       - 'push'
       - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-owner:latest'
 
+  # Deploy migration job and run migrations before API deploy
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'jobs'
+      - 'deploy'
+      - 'pos-repair-migrate'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$BUILD_ID'
+      - '--region'
+      - 'us-central1'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--set-cloudsql-instances'
+      - '${_SQL_CONNECTION_NAME}'
+      - '--vpc-connector'
+      - '${_VPC_CONNECTOR}'
+      - '--vpc-egress'
+      - 'all-traffic'
+      - '--set-env-vars'
+      - 'DATABASE_URL=${_DATABASE_URL},RUN_MIGRATIONS_ONLY=1'
+      - '--task-timeout'
+      - '300'
+      - '--max-retries'
+      - '0'
+    id: 'deploy-migrate-job'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        gcloud run jobs execute pos-repair-migrate --region=us-central1 --wait || EXIT=$$?
+        if [ "$${EXIT:-0}" -ne 0 ]; then
+          echo "=== Migration job failed. Recent job logs ==="
+          gcloud run jobs logs read pos-repair-migrate --region=us-central1 --limit=80 2>/dev/null || true
+          echo "=== End logs ==="
+          exit $${EXIT}
+        fi
+    id: 'run-migrations'
+    waitFor: ['deploy-migrate-job']
+    allow_failure: true
+
   # Deploy API to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
