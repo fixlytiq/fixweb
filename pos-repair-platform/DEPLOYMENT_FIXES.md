@@ -38,7 +38,7 @@ Make sure your trigger has ALL of these:
 |----------|-------|
 | `_SQL_CONNECTION_NAME` | `repair-pos-485101:us-central1:pos-repair-postgres` |
 | `_VPC_CONNECTOR` | `pos-repair-connector` |
-| `_DATABASE_URL` | `postgresql://posrepair_user:yDk428pJlBToNjZV@/pos_repair_platform?host=/cloudsql/repair-pos-485101:us-central1:pos-repair-postgres` |
+| `_DATABASE_URL` | `postgresql://posrepair_user:yDk428pJlBToNjZV@localhost/pos_repair_platform?host=/cloudsql/repair-pos-485101:us-central1:pos-repair-postgres` |
 | `_REDIS_HOST` | `10.75.215.211` |
 | `_JWT_SECRET` | `IWFKzVLkERlDJ0iX1caYCvpmqMBuxSfj` |
 | `_FRONTEND_URL` | `https://pos-repair-web-233232647471.us-central1.run.app;https://pos-repair-owner-233232647471.us-central1.run.app` |

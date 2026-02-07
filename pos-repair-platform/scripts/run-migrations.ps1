@@ -3,11 +3,11 @@
 #
 # Option 1 - Cloud SQL Proxy (recommended):
 #   1. Start proxy: cloud_sql_proxy -instances=repair-pos-485101:us-central1:pos-repair-postgres=tcp:5432
-#   2. $env:DATABASE_URL = "postgresql://USER:PASSWORD@127.0.0.1:5432/DATABASE"
+#   2. $env:DATABASE_URL = "postgresql://posrepair_user:PASSWORD@127.0.0.1:5432/pos_repair_platform"
 #   3. .\scripts\run-migrations.ps1
 #
 # Option 2 - Public IP (if enabled on the instance):
-#   $env:DATABASE_URL = "postgresql://USER:PASSWORD@PUBLIC_IP:5432/DATABASE"
+#   $env:DATABASE_URL = "postgresql://posrepair_user:PASSWORD@PUBLIC_IP:5432/pos_repair_platform"
 #   .\scripts\run-migrations.ps1
 
 $ErrorActionPreference = "Stop"
