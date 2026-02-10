@@ -1,25 +1,36 @@
 #!/usr/bin/env bash
-# Run Prisma migrations against the database in DATABASE_URL.
-# Use when the Cloud Run migration job can't reach Cloud SQL (e.g. socket not ready).
-#
-# Option 1 - Cloud SQL Proxy (recommended):
-#   1. Start proxy: cloud_sql_proxy -instances=repair-pos-485101:us-central1:pos-repair-postgres=tcp:5432
-#   2. export DATABASE_URL="postgresql://posrepair_user:PASSWORD@127.0.0.1:5432/pos_repair_platform"
-#   3. ./scripts/run-migrations.sh
-#
-# Option 2 - Public IP (if enabled on the instance):
-#   export DATABASE_URL="postgresql://posrepair_user:PASSWORD@PUBLIC_IP:5432/pos_repair_platform"
-#   ./scripts/run-migrations.sh
-#
-# Requires: Node, npm, and being in repo root or pos-repair-platform.
+# Run Prisma migrations. Loads DB credentials from apps/api/.env (DATABASE_URL or POSTGRES_*).
+# With Cloud SQL Proxy: start proxy, then run this script from pos-repair-platform.
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 API_DIR="$ROOT_DIR/apps/api"
+ENV_FILE="$API_DIR/.env"
+
+# Load .env from apps/api if present
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      '#'*) ;;
+      [A-Za-z_]*=*) export "$line" ;;
+    esac
+  done < "$ENV_FILE"
+  set +a
+fi
+
+# If still no DATABASE_URL, build from POSTGRES_* vars
+if [ -z "$DATABASE_URL" ] && [ -n "$POSTGRES_USER" ]; then
+  POSTGRES_HOST="${POSTGRES_HOST:-127.0.0.1}"
+  POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+  POSTGRES_DB="${POSTGRES_DB:-pos_repair_platform}"
+  PASS_ENC=$(node -e "console.log(encodeURIComponent(process.argv[1] || ''))" "${POSTGRES_PASSWORD:-}")
+  export DATABASE_URL="postgresql://${POSTGRES_USER}:${PASS_ENC}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
+fi
 
 if [ -z "$DATABASE_URL" ]; then
-  echo "Error: DATABASE_URL is not set. Set it to a reachable Postgres URL (e.g. via Cloud SQL Proxy)."
+  echo "Error: DATABASE_URL is not set. Add DATABASE_URL or POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB to apps/api/.env"
   exit 1
 fi
 
