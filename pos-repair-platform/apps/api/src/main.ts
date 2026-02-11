@@ -1,10 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { normalizeDatabaseUrl } from './utils/database-url';
+import { normalizeDatabaseUrl, logDatabaseConnectionDiagnostics } from './utils/database-url';
 
 async function bootstrap() {
   normalizeDatabaseUrl();
+  logDatabaseConnectionDiagnostics();
   const app = await NestFactory.create(AppModule);
   
   // Enable global validation

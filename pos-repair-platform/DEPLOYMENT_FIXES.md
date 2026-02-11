@@ -38,11 +38,38 @@ Make sure your trigger has ALL of these:
 |----------|-------|
 | `_SQL_CONNECTION_NAME` | `repair-pos-485101:us-central1:pos-repair-postgres` |
 | `_VPC_CONNECTOR` | `pos-repair-connector` |
-| `_DATABASE_URL` | `postgresql://posrepair_user:<PASSWORD_URL_ENCODED>@localhost/pos_repair_platform?host=/cloudsql/repair-pos-485101:us-central1:pos-repair-postgres` (no `:5432` in host param) |
+| `_DATABASE_URL` | See "DATABASE_URL (Brute Force)" below. No `:5432` after localhost. |
 | `_REDIS_HOST` | `10.75.215.211` |
 | `_JWT_SECRET` | `IWFKzVLkERlDJ0iX1caYCvpmqMBuxSfj` |
 | `_FRONTEND_URL` | `https://pos-repair-web-233232647471.us-central1.run.app;https://pos-repair-owner-233232647471.us-central1.run.app` |
 | `_PROJECT_NUMBER` | `233232647471` ⚠️ **NEW - ADD THIS** |
+
+## DATABASE_URL (Brute Force) – Cloud SQL Unix socket
+
+If Prisma still reports a path with `:5432` at the end, the running container may be using an old env/secret ("ghost" variable). Use one of these **exact** formats (no `:5432` after `localhost`):
+
+**Option A – plain host param:**
+```
+postgresql://posrepair_user:Pandu%40-%2A123@localhost/pos_repair_platform?host=/cloudsql/repair-pos-485101:us-central1:pos-repair-postgres
+```
+
+**Option B – URL-encoded host param** (if colons in the instance name break the parser):
+```
+postgresql://posrepair_user:Pandu%40-%2A123@localhost/pos_repair_platform?host=%2Fcloudsql%2Frepair-pos-485101%3Aus-central1%3Apos-repair-postgres
+```
+
+**If you use Secret Manager:** Create a **new version** of the `DATABASE_URL` secret with one of the strings above, then in Cloud Run ensure the service uses the **latest** version of that secret. Old secret versions can cause the "ghost" env.
+
+**Verify Cloud SQL mount:** If the app says "Can't reach database", the `/cloudsql/` directory may be empty. Check:
+```bash
+gcloud run services describe pos-repair-api --region=us-central1 --project=repair-pos-485101 --format="value(spec.template.metadata.annotations['run.googleapis.com/cloudsql-instances'])"
+```
+If this returns empty, run:
+```bash
+gcloud run services update pos-repair-api --region=us-central1 --project=repair-pos-485101 --add-cloudsql-instances repair-pos-485101:us-central1:pos-repair-postgres
+```
+
+**Startup diagnostic:** Set `DEBUG_DB=1` on the Cloud Run service to log (redacted) DATABASE_URL and whether the socket path exists. Check logs after deploy.
 
 ## Next Steps
 
