@@ -116,8 +116,9 @@ if [ "$RUN_MIGRATIONS_ONLY" = "1" ]; then
     exit 1
   fi
   echo "Executing: prisma migrate deploy --schema=apps/api/prisma/schema.prisma"
+  # BusyBox timeout uses "timeout SECS PROG ARGS" (no -t); GNU timeout accepts same
   if command -v timeout >/dev/null 2>&1; then
-    timeout -t 180 "$PRISMA_BIN" migrate deploy --schema=apps/api/prisma/schema.prisma 2>&1
+    timeout 180 "$PRISMA_BIN" migrate deploy --schema=apps/api/prisma/schema.prisma 2>&1
   else
     "$PRISMA_BIN" migrate deploy --schema=apps/api/prisma/schema.prisma 2>&1
   fi
