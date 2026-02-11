@@ -42,11 +42,27 @@ steps:
       - 'apps/owner/Dockerfile'
       - '.'
 
+  # Validate trigger: must use private IP for DB (no Cloud SQL socket)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    env:
+      - 'DB_URL=${_DATABASE_URL}'
+    args:
+      - '-c'
+      - |
+        if echo "$DB_URL" | grep -q '/cloudsql/'; then
+          echo "ERROR: Set _DATABASE_URL to private IP (e.g. postgresql://user:pass@10.221.0.3:5432/pos_repair_platform). Cloud SQL socket is not used."
+          exit 1
+        fi
+        echo "DATABASE_URL format OK (private IP)"
+    id: 'validate-database-url'
+
   # Push API image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - 'us-central1-docker.pkg.dev/$PROJECT_ID/pos-repair-images/pos-repair-api:$BUILD_ID'
+    id: 'push-api'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -78,6 +94,7 @@ steps:
   # Run migrations in the cloud (Cloud Run Job) before API deploy
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
+    waitFor: ['push-api', 'validate-database-url']
     args:
       - 'run'
       - 'jobs'
@@ -91,8 +108,6 @@ steps:
       - '1Gi'
       - '--cpu'
       - '1'
-      - '--set-cloudsql-instances'
-      - '${_SQL_CONNECTION_NAME}'
       - '--vpc-connector'
       - '${_VPC_CONNECTOR}'
       - '--vpc-egress'
@@ -110,10 +125,10 @@ steps:
     args:
       - '-c'
       - |
-        gcloud run jobs execute pos-repair-migrate --region=us-central1 --wait || EXIT=$$?
+        gcloud run jobs execute pos-repair-migrate --region=us-central1 --project=$PROJECT_ID --wait || EXIT=$$?
         if [ "$${EXIT:-0}" -ne 0 ]; then
           echo "=== Migration job failed. Recent job logs ==="
-          gcloud run jobs logs read pos-repair-migrate --region=us-central1 --limit=80 2>/dev/null || true
+          gcloud run jobs logs read pos-repair-migrate --region=us-central1 --project=$PROJECT_ID --limit=80 2>/dev/null || true
           echo "=== End logs ==="
           exit $${EXIT}
         fi
@@ -121,9 +136,10 @@ steps:
     waitFor: ['deploy-migrate-job']
     allow_failure: true
 
-  # Deploy API to Cloud Run
+  # Deploy API to Cloud Run (after migration step so tables exist when API starts)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
+    waitFor: ['run-migrations']
     args:
       - 'run'
       - 'deploy'
@@ -148,8 +164,6 @@ steps:
       - '--cpu-boost'
       - '--timeout'
       - '300'
-      - '--add-cloudsql-instances'
-      - '${_SQL_CONNECTION_NAME}'
       - '--vpc-connector'
       - '${_VPC_CONNECTOR}'
       - '--vpc-egress'

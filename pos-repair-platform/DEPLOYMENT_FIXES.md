@@ -1,5 +1,15 @@
 # Deployment Fixes Applied
 
+## Before first deploy (required)
+
+1. **Cloud Build trigger** → Substitution variables: set **`_DATABASE_URL`** to private IP **only** (no Cloud SQL socket):
+   ```
+   postgresql://posrepair_user:pandu%40-%2A123@10.221.0.3:5432/pos_repair_platform
+   ```
+   If you use a different password, URL-encode `@` as `%40` and `*` as `%2A`.
+2. The build will **fail at step "validate-database-url"** if `_DATABASE_URL` contains `/cloudsql/`. Fix the trigger and re-run.
+3. After a successful build, the migrate job runs (creates tables), then API/Web/Owner deploy. Registration and the app will work once migrations have run.
+
 ## Critical Issues Fixed
 
 ### 1. ✅ PROJECT_NUMBER Variable Fix
@@ -36,36 +46,24 @@ Make sure your trigger has ALL of these:
 
 | Variable | Value |
 |----------|-------|
-| `_SQL_CONNECTION_NAME` | `repair-pos-485101:us-central1:pos-repair-postgres` |
 | `_VPC_CONNECTOR` | `pos-repair-connector` |
-| `_DATABASE_URL` | See "DATABASE_URL (Brute Force)" below. No `:5432` after localhost. |
+| `_DATABASE_URL` | **Private IP only** – see "DATABASE_URL (Private IP)" below. |
 | `_REDIS_HOST` | `10.75.215.211` |
 | `_JWT_SECRET` | `IWFKzVLkERlDJ0iX1caYCvpmqMBuxSfj` |
 | `_FRONTEND_URL` | `https://pos-repair-web-233232647471.us-central1.run.app;https://pos-repair-owner-233232647471.us-central1.run.app` |
 | `_PROJECT_NUMBER` | `233232647471` ⚠️ **NEW - ADD THIS** |
 
-## DATABASE_URL (Brute Force) – Cloud SQL Unix socket
+## DATABASE_URL (Private IP) – required
 
-If Prisma still reports a path with `:5432` at the end, the running container may be using an old env/secret ("ghost" variable). Use one of these **exact** formats (no `:5432` after `localhost`):
+We use **private IP only** (no Cloud SQL Unix socket). API and migrate job connect via VPC to the Cloud SQL private IP.
 
-**Use URL-encoded host param** so Prisma does not append `:5432` to the path (fixes `.s.PGSQL.5432:5432` error):
+Set `_DATABASE_URL` in your Cloud Build trigger to:
 ```
-postgresql://posrepair_user:Pandu%40-%2A123@localhost/pos_repair_platform?host=%2Fcloudsql%2Frepair-pos-485101%3Aus-central1%3Apos-repair-postgres
+postgresql://posrepair_user:pandu%40-%2A123@10.221.0.3:5432/pos_repair_platform
 ```
-(`%2F` = `/`, `%3A` = `:`). Generate your own: `node pos-repair-platform/scripts/encode-cloudsql-database-url.js USER PASS DB`
+Use your actual password; encode `@` as `%40` and `*` as `%2A` if needed.
 
-**If you use Secret Manager:** Create a **new version** of the `DATABASE_URL` secret with one of the strings above, then in Cloud Run ensure the service uses the **latest** version of that secret. Old secret versions can cause the "ghost" env.
-
-**Verify Cloud SQL mount:** If the app says "Can't reach database", the `/cloudsql/` directory may be empty. Check:
-```bash
-gcloud run services describe pos-repair-api --region=us-central1 --project=repair-pos-485101 --format="value(spec.template.metadata.annotations['run.googleapis.com/cloudsql-instances'])"
-```
-If this returns empty, run:
-```bash
-gcloud run services update pos-repair-api --region=us-central1 --project=repair-pos-485101 --add-cloudsql-instances repair-pos-485101:us-central1:pos-repair-postgres
-```
-
-**Startup diagnostic:** Set `DEBUG_DB=1` on the Cloud Run service to log (redacted) DATABASE_URL and whether the socket path exists. Check logs after deploy.
+**If the API shows** "Can't reach database server at `/cloudsql/...`", the trigger still has the old socket URL. Replace it with the private IP URL above and redeploy.
 
 ## Next Steps
 
@@ -127,8 +125,10 @@ gcloud run services update pos-repair-api --region=us-central1 --project=repair-
 
 | Symptom | Likely cause | Fix |
 |--------|----------------|-----|
+| **Build fails at "validate-database-url"** | `_DATABASE_URL` is socket URL | Set `_DATABASE_URL` to private IP: `postgresql://user:pass@10.221.0.3:5432/pos_repair_platform`. |
 | **Cloud Build fails at Deploy** | IAM | Grant Cloud Build Service Account: **Cloud Run Admin**, **Service Account User**. |
-| **Cloud Run "Service Unavailable"** | API crashing on start | Check Cloud Run logs. Often: bad `DATABASE_URL`, DB not ready, or missing `JWT_SECRET`. |
+| **Cloud Run "Service Unavailable"** / **Container exit(1)** | API crashing on start | Check logs: if "Invalid DATABASE_URL for production: use private IP", set `_DATABASE_URL` to private IP and redeploy. |
+| **"Store table does not exist"** | Migrations not applied | Ensure `_DATABASE_URL` is private IP, then push to trigger build (migrate job runs). Or run: `gcloud run jobs execute pos-repair-migrate --region=us-central1 --project=repair-pos-485101 --wait` |
 | **Web/Owner 404 or wrong API URL** | Build args | Confirm `NEXT_PUBLIC_API_URL` was passed in the Docker build step and `_PROJECT_NUMBER` is set in the trigger. |
 | **Redis connection timeout** | VPC / egress | API must use the VPC connector; ensure `--vpc-connector` and `--vpc-egress=all-traffic` (or `private-ranges-only` if Redis-only). |
 
@@ -136,6 +136,7 @@ gcloud run services update pos-repair-api --region=us-central1 --project=repair-
 
 ## Verification Checklist
 
+- [ ] **`_DATABASE_URL`** is private IP (e.g. `postgresql://...@10.221.0.3:5432/pos_repair_platform`) — no `/cloudsql/`
 - [ ] `_PROJECT_NUMBER` added to trigger
 - [ ] `_FRONTEND_URL` uses semicolons
 - [ ] Cloud SQL instance is `RUNNABLE`

@@ -1,53 +1,64 @@
 /**
- * Cloud SQL Unix socket: we use "brute force" format so Prisma doesn't append :5432.
- * - Authority: postgresql://USER:PASSWORD@localhost/DB_NAME (no :5432 after localhost).
- * - Socket path in ?host= only. URL-encoding the host param can help when colons in
- *   the instance name (PROJECT:REGION:INSTANCE) break the URI parser.
- *
- * Brute force (directory): ?host=/cloudsql/repair-pos-485101:us-central1:pos-repair-postgres
- * URL-encoded:             ?host=%2Fcloudsql%2Frepair-pos-485101%3Aus-central1%3Apos-repair-postgres
+ * Production uses private IP only (no Cloud SQL Unix socket).
+ * If DATABASE_URL contains /cloudsql/ in production, fail fast with a clear message.
  */
 
 import * as fs from 'fs';
+import { execSync } from 'child_process';
+
+const CLOUDSQL_INSTANCE = 'repair-pos-485101:us-central1:pos-repair-postgres';
+const CLOUDSQL_DIR = `/cloudsql/${CLOUDSQL_INSTANCE}`;
+
+const PRIVATE_IP_HINT =
+  'Set _DATABASE_URL in the Cloud Build trigger to private IP: postgresql://USER:PASS@10.221.0.3:5432/pos_repair_platform';
 
 export function normalizeDatabaseUrl(): void {
-  let url = process.env.DATABASE_URL;
-  if (!url || !url.includes('/cloudsql/')) return;
+  const url = process.env.DATABASE_URL;
+  if (!url) return;
+
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isSocketUrl = url.includes('/cloudsql/');
+
+  if (isProduction && isSocketUrl) {
+    console.error(
+      'CRITICAL: DATABASE_URL is a Cloud SQL socket URL but this service uses private IP only. ' +
+        PRIVATE_IP_HINT,
+    );
+    throw new Error(
+      'Invalid DATABASE_URL for production: use private IP, not Cloud SQL socket. ' + PRIVATE_IP_HINT,
+    );
+  }
+
+  // In dev or if socket URL was used with socket mount, optional normalization (leave private IP as-is)
+  if (!isSocketUrl) return;
 
   try {
-    // 1. Force @localhost/ with NO port (Prisma must not see :5432 in authority or it can append to socket path)
-    const authMatch = url.match(/^(postgres(?:ql)?:\/\/[^@]+@)([^/]+)(\/[^?]*\??.*)$/);
+    let normalized = url.replace(/@localhost:5432\//, '@localhost/');
+    const authMatch = normalized.match(/^(postgres(?:ql)?:\/\/[^@]+@)([^/]+)(\/[^?]*\??.*)$/);
     if (authMatch) {
       const [, prefix, hostPart, pathAndQuery] = authMatch;
       if (hostPart !== 'localhost') {
-        const newHost = hostPart.includes(':') ? 'localhost' : hostPart;
-        url = `${prefix}${newHost}${pathAndQuery}`;
+        normalized = `${prefix}localhost${pathAndQuery}`;
       }
     }
-    // Strip :5432 from authority if still present
-    url = url.replace(/@localhost:5432\//, '@localhost/');
-
-    // 2. Normalize ?host= value: strip trailing :5432 (driver must not append it)
-    const hostParamMatch = url.match(/\?host=([^&]+)/);
+    const hostParamMatch = normalized.match(/\?host=([^&]+)/);
     if (hostParamMatch) {
       let socketPath = decodeURIComponent(hostParamMatch[1]);
-      if (socketPath.endsWith(':5432') && !socketPath.endsWith('/.s.PGSQL.5432')) {
-        socketPath = socketPath.slice(0, -5);
-      }
-      // URL-encode the host param so colons in instance name don't break the URI parser
+      if (socketPath.endsWith(':5432')) socketPath = socketPath.slice(0, -5);
+      if (socketPath.endsWith('/.s.PGSQL.5432')) socketPath = socketPath.slice(0, -'.s.PGSQL.5432'.length);
+      socketPath = socketPath.replace(/\/+$/, '');
       const encodedHost = encodeURIComponent(socketPath);
-      url = url.replace(/\?host=[^&]+/, `?host=${encodedHost}`);
+      normalized = normalized.replace(/\?host=[^&]+/, `?host=${encodedHost}`);
     }
-
-    process.env.DATABASE_URL = url;
+    process.env.DATABASE_URL = normalized;
   } catch {
     // If parsing fails, leave DATABASE_URL unchanged
   }
 }
 
 /**
- * Log what the container sees: redacted DATABASE_URL and whether the socket path exists.
- * Run at startup when DEBUG_DB=1 or in development. Helps catch "ghost" env or empty /cloudsql/.
+ * Senior Dev Diagnostic: Log what the container sees (redacted URL).
+ * Run at startup when DEBUG_DB=1 or in development.
  */
 export function logDatabaseConnectionDiagnostics(): void {
   const url = process.env.DATABASE_URL;
@@ -56,17 +67,19 @@ export function logDatabaseConnectionDiagnostics(): void {
 
   const redacted = url.replace(/:[^:@]+@/, ':****@');
   console.log('[DB diagnostic] DATABASE_URL (redacted):', redacted);
-
-  const hostMatch = url.match(/\?host=([^&]+)/);
-  if (hostMatch) {
-    const socketPath = decodeURIComponent(hostMatch[1]);
-    const dir = socketPath.endsWith('/.s.PGSQL.5432') ? socketPath.slice(0, -'.s.PGSQL.5432'.length) : socketPath;
-    const fileExists = fs.existsSync(socketPath);
-    const dirExists = fs.existsSync(dir);
-    console.log('[DB diagnostic] socket path:', socketPath);
-    console.log('[DB diagnostic] socket file exists:', fileExists, '| directory exists:', dirExists);
-    if (!fileExists && !dirExists) {
-      console.warn('[DB diagnostic] /cloudsql/ mount may be empty. Check Cloud Run annotations: run.googleapis.com/cloudsql-instances');
+  if (url.includes('/cloudsql/')) {
+    const hostMatch = url.match(/\?host=([^&]+)/);
+    if (hostMatch) {
+      const socketPath = decodeURIComponent(hostMatch[1]);
+      const dirExists = fs.existsSync(socketPath);
+      console.log('[DB diagnostic] socket path (decoded):', socketPath);
+      console.log('[DB diagnostic] directory exists:', dirExists);
+    }
+    try {
+      const files = execSync(`ls -la "${CLOUDSQL_DIR}" 2>&1`).toString();
+      console.log('[DB diagnostic] /cloudsql/ contents:', files);
+    } catch {
+      console.error('[DB diagnostic] /cloudsql/ directory missing or empty');
     }
   }
 }
