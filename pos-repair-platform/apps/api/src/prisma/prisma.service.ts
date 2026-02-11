@@ -1,6 +1,10 @@
 import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
+/**
+ * Singleton Prisma client (single instance per app via Nest DI).
+ * Provided by PrismaModule (@Global), so one instance prevents connection pooling exhaustion during hot reloads.
+ */
 @Injectable()
 export class PrismaService
   extends PrismaClient
@@ -9,8 +13,12 @@ export class PrismaService
   private readonly logger = new Logger(PrismaService.name);
 
   async onModuleInit(): Promise<void> {
+    if (process.env.NODE_ENV === 'development' && process.env.DATABASE_URL?.includes('/cloudsql/')) {
+      this.logger.warn(
+        'DATABASE_URL uses Cloud SQL socket. Ensure Cloud SQL Proxy is running (e.g. cloud_sql_proxy -instances=...=tcp:5432) or use a local DB URL.',
+      );
+    }
     // Do not block startup on DB connection (Cloud Run needs container to listen on PORT quickly).
-    // Prisma connects lazily on first query; optional: trigger connect in background.
     setImmediate(() => this.connectWithRetry());
   }
 
