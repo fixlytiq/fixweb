@@ -45,12 +45,15 @@ steps:
   # Validate trigger: must use private IP for DB (no Cloud SQL socket)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
-    env:
-      - 'DB_URL=${_DATABASE_URL}'
     args:
       - '-c'
       - |
-        if echo "$DB_URL" | grep -q '/cloudsql/'; then
+        DB_URL="${_DATABASE_URL}"
+        if [ -z "$${DB_URL}" ]; then
+          echo "ERROR: _DATABASE_URL is not set in the Cloud Build trigger. Add it (private IP)."
+          exit 1
+        fi
+        if echo "$${DB_URL}" | grep -q '/cloudsql/'; then
           echo "ERROR: Set _DATABASE_URL to private IP (e.g. postgresql://user:pass@10.221.0.3:5432/pos_repair_platform). Cloud SQL socket is not used."
           exit 1
         fi
