@@ -42,7 +42,9 @@ wait_for_postgres() {
   DB_USER=$(echo "$DATABASE_URL" | sed -n 's|postgresql://\([^:]*\):.*|\1|p')
   DB_PASS=$(echo "$DATABASE_URL" | sed -n 's|postgresql://[^:]*:\([^@]*\)@.*|\1|p')
   DB_NAME=$(echo "$DATABASE_URL" | sed -n 's|.*/\([^?]*\).*|\1|p')
-  
+  # URL-decode password so psql gets the real password (e.g. %40 -> @, %2A -> *)
+  DB_PASS=$(echo "$DB_PASS" | sed 's/%40/@/g; s/%2A/*/g; s/%23/#/g; s/%2F/\//g')
+
   DB_HOST=${DB_HOST:-postgres}
   DB_PORT=${DB_PORT:-5432}
   DB_USER=${DB_USER:-postgres}

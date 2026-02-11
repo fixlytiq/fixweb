@@ -48,15 +48,11 @@ Make sure your trigger has ALL of these:
 
 If Prisma still reports a path with `:5432` at the end, the running container may be using an old env/secret ("ghost" variable). Use one of these **exact** formats (no `:5432` after `localhost`):
 
-**Option A – plain host param:**
-```
-postgresql://posrepair_user:Pandu%40-%2A123@localhost/pos_repair_platform?host=/cloudsql/repair-pos-485101:us-central1:pos-repair-postgres
-```
-
-**Option B – URL-encoded host param** (if colons in the instance name break the parser):
+**Use URL-encoded host param** so Prisma does not append `:5432` to the path (fixes `.s.PGSQL.5432:5432` error):
 ```
 postgresql://posrepair_user:Pandu%40-%2A123@localhost/pos_repair_platform?host=%2Fcloudsql%2Frepair-pos-485101%3Aus-central1%3Apos-repair-postgres
 ```
+(`%2F` = `/`, `%3A` = `:`). Generate your own: `node pos-repair-platform/scripts/encode-cloudsql-database-url.js USER PASS DB`
 
 **If you use Secret Manager:** Create a **new version** of the `DATABASE_URL` secret with one of the strings above, then in Cloud Run ensure the service uses the **latest** version of that secret. Old secret versions can cause the "ghost" env.
 
@@ -109,12 +105,17 @@ gcloud run services update pos-repair-api --region=us-central1 --project=repair-
 - If you ever switch to **private-only** egress (no Twilio/SMTP), use `--vpc-egress=private-ranges-only`.
 
 ### 3. Database & Migrations
-- **Pipeline:** Each build deploys the `pos-repair-migrate` job and runs it before deploying the API. If the job can't reach Cloud SQL (socket not ready), the step is allowed to fail and the rest of the build continues.
-- **Manual sync (when the job can't reach DB):** From a machine that can reach Postgres (e.g. with Cloud SQL Proxy), set `DATABASE_URL` and run:
-  - **Windows:** `.\scripts\run-migrations.ps1`
+- **Pipeline:** Each build deploys the `pos-repair-migrate` job and runs it before deploying the API. The job uses the same **private IP** `DATABASE_URL` as the API (`postgresql://user:encoded_password@10.221.0.3:5432/pos_repair_platform`). The entrypoint URL-decodes the password for the `psql` readiness check.
+- **"Store table does not exist":** Migrations have not been applied. Ensure `_DATABASE_URL` in the Cloud Build trigger is the **private IP** URL, then push to trigger a build so the migrate job runs with the latest image. To run the job again without a full build:
+  ```powershell
+  gcloud run jobs execute pos-repair-migrate --region=us-central1 --project=repair-pos-485101 --wait
+  ```
+- **Manual sync (from your machine):** Use Cloud SQL Proxy and run migrations from `pos-repair-platform`:
+  - Start proxy: `cloud_sql_proxy -instances=repair-pos-485101:us-central1:pos-repair-postgres=tcp:5432`
+  - Set `DATABASE_URL` to `postgresql://posrepair_user:YOUR_PASSWORD@127.0.0.1:5432/pos_repair_platform` (password must match the Cloud SQL user; if it contains `@` or `*`, URL-encode as `%40` / `%2A`).
+  - **Windows:** `.\scripts\run-migrations.ps1`  
   - **Bash:** `./scripts/run-migrations.sh`
-  - Example with Cloud SQL Proxy: start `cloud_sql_proxy -instances=repair-pos-485101:us-central1:pos-repair-postgres=tcp:5432`, then `DATABASE_URL="postgresql://posrepair_user:PASSWORD@127.0.0.1:5432/pos_repair_platform"` and run the script from `pos-repair-platform`.
-- **Connection:** We use **Cloud SQL Proxy** (Unix socket) via `--add-cloudsql-instances` and `DATABASE_URL` with `?host=/cloudsql/PROJECT:REGION:INSTANCE`. Alternative: private IP in VPC with `postgresql://user:password@PRIVATE_IP:5432/dbname` and no `--add-cloudsql-instances` (connector still needed for Redis).
+- **Connection:** We use **private IP** in VPC: `postgresql://posrepair_user:pandu%40-%2A123@10.221.0.3:5432/pos_repair_platform`. No `--add-cloudsql-instances`; VPC connector is used for Redis and DB.
 
 ### 4. Build-Time Env (Next.js)
 - **Web & Owner:** Both Docker builds receive `--build-arg NEXT_PUBLIC_API_URL=https://pos-repair-api-${_PROJECT_NUMBER}.us-central1.run.app` in `cloudbuild.yaml`, so the frontend does not call `localhost:3000` in production.
