@@ -328,12 +328,11 @@ ALTER TABLE "WaiverTemplate" ADD CONSTRAINT "WaiverTemplate_storeId_fkey" FOREIG
 ALTER TABLE "TimeClock" ADD CONSTRAINT "TimeClock_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "Refund" ADD CONSTRAINT "Refund_refundedById_fkey" FOREIGN KEY ("refundedById") REFERENCES "Employee"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- Step 9: Drop old tables
+-- Step 9: Drop Store's dependency on Organization first, then drop old tables
+ALTER TABLE "Store" DROP CONSTRAINT IF EXISTS "Store_organizationId_fkey";
+ALTER TABLE "Store" DROP COLUMN IF EXISTS "organizationId";
+
 DROP TABLE IF EXISTS "StoreUserRole";
 DROP TABLE IF EXISTS "Membership";
 DROP TABLE IF EXISTS "Organization";
-
--- Step 10: Drop organizationId from Store
-ALTER TABLE "Store" DROP CONSTRAINT IF EXISTS "Store_organizationId_fkey";
-ALTER TABLE "Store" DROP COLUMN IF EXISTS "organizationId";
 
