@@ -115,6 +115,9 @@ if [ "$RUN_MIGRATIONS_ONLY" = "1" ]; then
     echo "Error: Prisma binary not found in /app/apps/api/node_modules/.bin or /app/node_modules/.bin"
     exit 1
   fi
+  # Clear any previously failed migration so deploy can re-run in correct order
+  echo "Resolving any failed migration (idempotent)..."
+  "$PRISMA_BIN" migrate resolve --rolled-back "20250115000000_remove_organization_add_owner_employee" --schema=apps/api/prisma/schema.prisma 2>/dev/null || true
   echo "Executing: prisma migrate deploy --schema=apps/api/prisma/schema.prisma"
   # BusyBox timeout uses "timeout SECS PROG ARGS" (no -t); GNU timeout accepts same
   if command -v timeout >/dev/null 2>&1; then
