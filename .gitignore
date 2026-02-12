@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 **/node_modules/
 dist/
 **/dist/
@@ -6,3 +6,6 @@ dist/
 *.tsbuildinfo
 .env
 .env.*
+
+# Exported Cloud Build trigger config (may contain secrets)
+trigger-config.yaml
