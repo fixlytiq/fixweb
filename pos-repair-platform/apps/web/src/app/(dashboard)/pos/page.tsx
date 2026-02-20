@@ -7,7 +7,7 @@ import { inventoryApi, type StockItem } from "@/lib/api/inventory";
 import { ticketsApi, type Ticket } from "@/lib/api/tickets";
 import { storesApi, type Store } from "@/lib/api/stores";
 import { salesApi } from "@/lib/api/sales";
-import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Loader2, AlertTriangle, Ticket as TicketIcon, X, Edit2, Percent, DollarSign, Ban } from "lucide-react";
+import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Loader2, AlertTriangle, Ticket as TicketIcon, X, Edit2, Percent, DollarSign, Ban, Banknote, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -45,6 +45,10 @@ export default function POSPage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [priceInput, setPriceInput] = useState<string>("");
   const [discountInput, setDiscountInput] = useState<string>("");
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"cash" | "card" | null>(null);
+  /** One idempotency key per payment attempt (modal open). Reused if user retries so server returns same result (no double charge). */
+  const [paymentIdempotencyKey, setPaymentIdempotencyKey] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -209,11 +213,25 @@ export default function POSPage() {
     setCart(cart.filter((item) => item.id !== id));
   };
 
-  const handleCheckout = async () => {
+  const handleOpenPaymentModal = () => {
     if (cart.length === 0) {
       alert("Cart is empty");
       return;
     }
+    setSelectedPaymentMethod(null);
+    setPaymentIdempotencyKey(`pos_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`);
+    setShowPaymentModal(true);
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!selectedPaymentMethod) return;
+    setShowPaymentModal(false);
+    await handleCheckout();
+    setSelectedPaymentMethod(null);
+  };
+
+  const handleCheckout = async () => {
+    if (cart.length === 0) return;
 
     setIsProcessing(true);
     try {
@@ -226,14 +244,27 @@ export default function POSPage() {
       const tax = isTaxExempt ? 0 : subtotal * taxRate;
       const total = subtotal + tax;
 
-      // Create sale via API
+      // Build line items from cart (for receipt and inventory deduction)
+      const lineItems = cart.map((item) => ({
+        stockItemId: item.stockItemId || undefined,
+        description: item.name,
+        quantity: item.quantity,
+        unitPrice: item.price - (item.discount || 0),
+      }));
+
+      const paymentMethod = selectedPaymentMethod === "cash" ? "CASH" : "CARD";
       await salesApi.create({
         ticketId: ticket?.id,
         customerId: selectedCustomer || undefined,
         subtotal: subtotal,
         tax: tax,
         total: total,
-        paymentStatus: "PAID",
+        paymentStatus: paymentMethod === "CASH" ? "PAID" : "PENDING",
+        lineItems,
+        paymentMethod,
+        ...(paymentMethod === "CARD" && paymentIdempotencyKey
+          ? { idempotencyKey: paymentIdempotencyKey }
+          : {}),
       });
 
       const message = ticket 
@@ -635,7 +666,7 @@ export default function POSPage() {
             </div>
             
             <button
-              onClick={handleCheckout}
+              onClick={handleOpenPaymentModal}
               disabled={isProcessing}
               className="w-full rounded-xl bg-gradient-to-r from-primary to-primary/90 px-4 py-3 text-base font-medium text-primary-foreground shadow-sm transition-all hover:from-primary/90 hover:to-primary/80 hover:shadow-lg hover:shadow-primary/30 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm disabled:hover:translate-y-0 flex items-center justify-center gap-2"
             >
@@ -806,6 +837,101 @@ export default function POSPage() {
                 className="flex-1 rounded-xl border border-border/40 bg-background/80 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment method selection modal – choose Cash or Card before completing */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border/40 bg-gradient-to-br from-card via-card to-card/95 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-border">
+              <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Complete payment
+              </h2>
+              <button
+                type="button"
+                onClick={() => { setShowPaymentModal(false); setSelectedPaymentMethod(null); }}
+                className="rounded-lg p-1 text-muted-foreground hover:bg-accent transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Order summary */}
+              <div className="rounded-xl border border-border/40 bg-muted/30 p-4 space-y-2">
+                <p className="text-sm font-medium text-foreground">Order total</p>
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span>${subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Tax {isTaxExempt ? "(Exempt)" : ""}</span>
+                  <span>${tax.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-base font-bold text-foreground pt-2 border-t border-border">
+                  <span>Total</span>
+                  <span>${total.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Payment method choice */}
+              <div>
+                <p className="text-sm font-medium text-foreground mb-3">Select payment method</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPaymentMethod("cash")}
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-6 transition-all",
+                      selectedPaymentMethod === "cash"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/40 bg-background/50 text-foreground hover:border-primary/50 hover:bg-primary/5"
+                    )}
+                  >
+                    <Banknote className="h-10 w-10" />
+                    <span className="font-semibold">Cash</span>
+                    <span className="text-xs text-muted-foreground">Cash payment</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPaymentMethod("card")}
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-6 transition-all",
+                      selectedPaymentMethod === "card"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/40 bg-background/50 text-foreground hover:border-primary/50 hover:bg-primary/5"
+                    )}
+                  >
+                    <Smartphone className="h-10 w-10" />
+                    <span className="font-semibold">Card / Device</span>
+                    <span className="text-xs text-muted-foreground">Card or payment terminal</span>
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleConfirmPayment}
+                disabled={!selectedPaymentMethod || isProcessing}
+                className="w-full rounded-xl bg-gradient-to-r from-primary to-primary/90 px-4 py-3 text-base font-medium text-primary-foreground shadow-sm transition-all hover:from-primary/90 hover:to-primary/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="h-5 w-5" />
+                    Complete payment
+                  </>
+                )}
               </button>
             </div>
           </div>

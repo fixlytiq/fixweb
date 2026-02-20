@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -19,12 +20,14 @@ import { VendorsModule } from './vendors/vendors.module';
 import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { DisputesModule } from './disputes/disputes.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     RedisModule,
     AuthModule,
@@ -42,6 +45,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     PurchaseOrdersModule,
     DisputesModule,
     NotificationsModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

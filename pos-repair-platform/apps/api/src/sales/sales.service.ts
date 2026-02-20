@@ -1,12 +1,17 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaymentService } from '../payment/payment.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UserPayload } from '../auth/types';
 import { StoreRole, PaymentStatus } from '@prisma/client';
+import { StockMovementReason, TransactionStatus } from '@prisma/client';
 
 @Injectable()
 export class SalesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly paymentService: PaymentService,
+  ) {}
 
   async create(user: UserPayload, createSaleDto: CreateSaleDto) {
     // OWNER, MANAGER, and CASHIER can create sales
@@ -45,27 +50,154 @@ export class SalesService {
       }
     }
 
-    try {
-      // Create sale without includes first to avoid relation errors
-      const sale = await this.prisma.sale.create({
-        data: {
-          id: crypto.randomUUID(),
-          storeId: user.storeId,
-          ticketId: createSaleDto.ticketId || undefined,
-          customerId: createSaleDto.customerId || undefined,
-          subtotal: createSaleDto.subtotal,
-          tax: createSaleDto.tax,
-          total: createSaleDto.total,
-          paymentStatus: createSaleDto.paymentStatus || PaymentStatus.PAID,
-          reference: createSaleDto.reference || undefined,
-          paidAt: createSaleDto.paymentStatus === PaymentStatus.PAID ? new Date() : undefined,
-          updatedAt: new Date(),
-        },
-      });
+    const lineItems = createSaleDto.lineItems ?? [];
+    const paymentMethod = createSaleDto.paymentMethod ?? 'CASH';
+    const isCard = paymentMethod === 'CARD';
 
-      // Then fetch with relations if needed
+    if (isCard && !createSaleDto.idempotencyKey) {
+      throw new BadRequestException('idempotencyKey is required when paymentMethod is CARD');
+    }
+
+    // Validate stock availability for line items that have stockItemId
+    for (const item of lineItems) {
+      if (item.stockItemId) {
+        const stockItem = await this.prisma.stockItem.findFirst({
+          where: {
+            id: item.stockItemId,
+            storeId: user.storeId,
+          },
+        });
+        if (!stockItem) {
+          throw new BadRequestException(`Stock item ${item.stockItemId} not found`);
+        }
+        const qty = Math.floor(Number(item.quantity));
+        if (stockItem.quantityOnHand < qty) {
+          throw new BadRequestException(
+            `Insufficient stock for "${stockItem.name}": have ${stockItem.quantityOnHand}, need ${qty}`,
+          );
+        }
+      }
+    }
+
+    try {
+      const saleId = crypto.randomUUID();
+      const totalAmount = Number(createSaleDto.total);
+      const amountCents = Math.round(totalAmount * 100);
+
+      if (isCard) {
+        // Card flow: create Sale PENDING + line items only; no inventory deduction yet.
+        await this.prisma.$transaction(async (tx) => {
+          await tx.sale.create({
+            data: {
+              id: saleId,
+              storeId: user.storeId,
+              ticketId: createSaleDto.ticketId || undefined,
+              customerId: createSaleDto.customerId || undefined,
+              subtotal: createSaleDto.subtotal,
+              tax: createSaleDto.tax,
+              total: createSaleDto.total,
+              paymentStatus: PaymentStatus.PENDING,
+              reference: createSaleDto.reference || undefined,
+              updatedAt: new Date(),
+            },
+          });
+          for (const item of lineItems) {
+            const qty = Math.floor(Number(item.quantity));
+            const unitPrice = Number(item.unitPrice);
+            const lineTotal = unitPrice * qty;
+            const lineItemId = crypto.randomUUID();
+            await tx.saleLineItem.create({
+              data: {
+                id: lineItemId,
+                saleId,
+                stockItemId: item.stockItemId || undefined,
+                description: item.description,
+                quantity: qty,
+                unitPrice,
+                total: lineTotal,
+              },
+            });
+          }
+        });
+
+        const confirmResult = await this.paymentService.confirmPayment({
+          saleId,
+          storeId: user.storeId,
+          amountCents,
+          idempotencyKey: createSaleDto.idempotencyKey!,
+          token: createSaleDto.paymentToken,
+        });
+
+        if (confirmResult.status === TransactionStatus.SUCCEEDED) {
+          await this.deductInventoryForSale(saleId, user.storeId, createSaleDto.ticketId);
+        } else {
+          const msg =
+            confirmResult.internalErrorCode ?? confirmResult.status;
+          throw new BadRequestException(
+            `Payment failed: ${msg}. Sale ${saleId} remains PENDING.`,
+          );
+        }
+      } else {
+        // Cash flow: create Sale PAID + line items + inventory deduction in one transaction.
+        const paidAt = new Date();
+        await this.prisma.$transaction(async (tx) => {
+          await tx.sale.create({
+            data: {
+              id: saleId,
+              storeId: user.storeId,
+              ticketId: createSaleDto.ticketId || undefined,
+              customerId: createSaleDto.customerId || undefined,
+              subtotal: createSaleDto.subtotal,
+              tax: createSaleDto.tax,
+              total: createSaleDto.total,
+              paymentStatus: createSaleDto.paymentStatus ?? PaymentStatus.PAID,
+              reference: createSaleDto.reference || undefined,
+              paidAt,
+              updatedAt: new Date(),
+            },
+          });
+          for (const item of lineItems) {
+            const qty = Math.floor(Number(item.quantity));
+            const unitPrice = Number(item.unitPrice);
+            const lineTotal = unitPrice * qty;
+            const lineItemId = crypto.randomUUID();
+            await tx.saleLineItem.create({
+              data: {
+                id: lineItemId,
+                saleId,
+                stockItemId: item.stockItemId || undefined,
+                description: item.description,
+                quantity: qty,
+                unitPrice,
+                total: lineTotal,
+              },
+            });
+            if (item.stockItemId && qty > 0) {
+              await tx.stockMovement.create({
+                data: {
+                  id: crypto.randomUUID(),
+                  storeId: user.storeId,
+                  stockItemId: item.stockItemId,
+                  quantityChange: -qty,
+                  reason: StockMovementReason.SALE,
+                  saleLineItemId: lineItemId,
+                  ticketId: createSaleDto.ticketId || undefined,
+                },
+              });
+              await tx.stockItem.update({
+                where: { id: item.stockItemId },
+                data: {
+                  quantityOnHand: { decrement: qty },
+                  updatedAt: new Date(),
+                },
+              });
+            }
+          }
+        });
+      }
+
       return this.prisma.sale.findUnique({
-        where: { id: sale.id },
+        where: { id: saleId },
         include: {
           Customer: {
             select: {
@@ -83,6 +215,7 @@ export class SalesService {
               status: true,
             },
           },
+          SaleLineItem: true,
         },
       });
     } catch (error: any) {
@@ -178,6 +311,43 @@ export class SalesService {
     }
 
     return sale;
+  }
+
+  /**
+   * Deduct inventory for a sale (after payment confirmed). Used for CARD flow.
+   */
+  async deductInventoryForSale(
+    saleId: string,
+    storeId: string,
+    ticketId?: string,
+  ): Promise<void> {
+    const lineItems = await this.prisma.saleLineItem.findMany({
+      where: { saleId },
+    });
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of lineItems) {
+        if (!item.stockItemId || item.quantity <= 0) continue;
+        const qty = item.quantity;
+        await tx.stockMovement.create({
+          data: {
+            id: crypto.randomUUID(),
+            storeId,
+            stockItemId: item.stockItemId,
+            quantityChange: -qty,
+            reason: StockMovementReason.SALE,
+            saleLineItemId: item.id,
+            ticketId: ticketId || null,
+          },
+        });
+        await tx.stockItem.update({
+          where: { id: item.stockItemId },
+          data: {
+            quantityOnHand: { decrement: qty },
+            updatedAt: new Date(),
+          },
+        });
+      }
+    });
   }
 
   async findByTicketId(user: UserPayload, ticketId: string) {

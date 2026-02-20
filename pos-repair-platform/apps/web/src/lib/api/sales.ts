@@ -1,6 +1,6 @@
 import { apiClient } from '../api-client';
 
-export type PaymentStatus = 'PENDING' | 'AUTHORIZED' | 'PAID' | 'REFUNDED' | 'VOID';
+export type PaymentStatus = 'PENDING' | 'AUTHORIZED' | 'PAID' | 'REFUNDED' | 'VOID' | 'FAILED';
 
 export interface Sale {
   id: string;
@@ -47,7 +47,9 @@ export const salesApi = {
   },
 
   /**
-   * Create a new sale
+   * Create a new sale (with optional line items; inventory is deducted when payment succeeds).
+   * - CASH: sale created as PAID and inventory deducted immediately.
+   * - CARD: sale created as PENDING, then provider capture; on success sale set to PAID and inventory deducted. Requires idempotencyKey to avoid double charge.
    */
   create: async (data: {
     ticketId?: string;
@@ -57,6 +59,18 @@ export const salesApi = {
     total: number;
     paymentStatus?: PaymentStatus;
     reference?: string;
+    lineItems?: {
+      stockItemId?: string;
+      description: string;
+      quantity: number;
+      unitPrice: number;
+    }[];
+    /** CASH = immediate PAID. CARD = confirm via provider (requires idempotencyKey). */
+    paymentMethod?: 'CASH' | 'CARD';
+    /** Required for CARD. Unique per attempt (e.g. one per modal open). */
+    idempotencyKey?: string;
+    /** Provider token (e.g. Stripe). Never send raw card data (PCI). */
+    paymentToken?: string;
   }): Promise<Sale> => {
     return await apiClient.post<Sale>('/sales', data);
   },

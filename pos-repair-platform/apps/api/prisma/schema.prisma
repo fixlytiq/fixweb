@@ -189,7 +189,7 @@ model Sale {
   storeId       String
   ticketId      String?
   customerId    String?
-  paymentStatus PaymentStatus  @default(PAID)
+  paymentStatus PaymentStatus  @default(PENDING)
   reference     String?
   subtotal      Decimal?       @db.Decimal(10, 2)
   tax           Decimal?       @db.Decimal(10, 2)
@@ -202,11 +202,38 @@ model Sale {
   Store         Store          @relation(fields: [storeId], references: [id])
   Ticket        Ticket?        @relation(fields: [ticketId], references: [id])
   SaleLineItem  SaleLineItem[]
+  PaymentTransaction PaymentTransaction[]
   NotificationHistory NotificationHistory[]
 
   @@index([customerId])
   @@index([storeId])
   @@index([ticketId])
+}
+
+/// One payment attempt per idempotency key. Used for double-charge guard and reconciliation.
+model PaymentTransaction {
+  id                    String           @id
+  idempotencyKey        String           @unique
+  saleId                String
+  storeId               String
+  status                TransactionStatus @default(PENDING)
+  provider              String           // e.g. "stub" | "stripe" | "adyen"
+  providerTransactionId String?
+  amount                Decimal          @db.Decimal(10, 2)
+  currency              String           @default("USD")
+  /// Masked request/response for disputes; never store raw card data.
+  requestPayload        Json?
+  responsePayload       Json?
+  internalErrorCode     String?          // Our normalized error code
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  Sale                  Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  Store                 Store            @relation(fields: [storeId], references: [id])
+
+  @@index([saleId])
+  @@index([storeId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model SaleLineItem {
@@ -294,6 +321,7 @@ model Store {
   PurchaseOrder  PurchaseOrder[]
   Refund         Refund[]
   Sale           Sale[]
+  PaymentTransaction PaymentTransaction[]
   NotificationHistory NotificationHistory[]
   StockItem      StockItem[]
   StockMovement  StockMovement[]
@@ -496,6 +524,16 @@ enum PaymentStatus {
   PAID
   REFUNDED
   VOID
+  FAILED
+}
+
+/// Per-attempt status for provider handshake. Sale.paymentStatus only becomes PAID after SUCCEEDED.
+enum TransactionStatus {
+  PENDING    // Request sent; waiting for provider
+  AUTHORIZED // Funds held (pre-auth)
+  FAILED     // Provider returned error
+  SUCCEEDED  // Money confirmed; safe to set Sale PAID
+  UNKNOWN    // Timeout/network; needs reconciliation
 }
 
 enum PurchaseOrderStatus {
